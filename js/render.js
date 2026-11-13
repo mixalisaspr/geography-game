@@ -1002,6 +1002,7 @@ export class Renderer {
     level.theme._flag = level.country?.colors?.[0];
     this.particles = [];
     this.floaters = [];
+    this.flash = 0;
   }
 
   snapCamera(bike) {
@@ -1049,10 +1050,28 @@ export class Renderer {
     for (const p of this.particles) {
       p.life -= dt;
       p.vy += (p.g ?? 300) * dt;
+      if (p.drag) {
+        const k = Math.exp(-p.drag * dt);
+        p.vx *= k;
+        p.vy *= k;
+      }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
+      if (p.grow) p.size += p.grow * dt;
+      if (p.vr) p.rot += p.vr * dt;
+      // συντρίμμια και τροχοί αναπηδούν στο έδαφος
+      if (p.bounce) {
+        const gy = sim.world.groundY(p.x) - p.size;
+        if (p.y > gy && !sim.world.gapAt(p.x)) {
+          p.y = gy;
+          p.vy *= -p.bounce;
+          p.vx *= 0.75;
+          p.vr *= 0.7;
+        }
+      }
     }
     this.particles = this.particles.filter((p) => p.life > 0);
+    this.flash = Math.max(0, (this.flash || 0) - dt * 3);
     for (const f of this.floaters) {
       f.life -= dt;
       f.y -= 30 * dt;
@@ -1079,8 +1098,158 @@ export class Renderer {
     }
   }
 
-  floatText(x, y, text, color = '#fff') {
-    this.floaters.push({ x, y, text, color, life: 1.4 });
+  floatText(x, y, text, color = '#fff', size = 26) {
+    this.floaters.push({ x, y, text, color, size, life: 1.4 });
+  }
+
+  /** Κινούμενη έκρηξη (καρτουνίστικη): λάμψη, κύμα, φωτιά, καπνός, συντρίμμια και οι δύο τροχοί. */
+  explode(x, y, bike) {
+    this.flash = 1;
+    this.shake = 1.2;
+    const P = this.particles;
+    P.push({ kind: 'ring', x, y, vx: 0, vy: 0, g: 0, size: 10, grow: 420, life: 0.45, max: 0.45 });
+    const fire = ['#fff3b0', '#ffd23f', '#ff9f1c', '#ff5400', '#e63946'];
+    for (let i = 0; i < 34; i++) {
+      const a = Math.random() * TAU;
+      const sp = 60 + Math.random() * 260;
+      P.push({
+        kind: 'fire',
+        x: x + Math.cos(a) * 6,
+        y: y + Math.sin(a) * 6,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 60,
+        g: -120,
+        drag: 3.5,
+        size: 7 + Math.random() * 10,
+        grow: 26,
+        color: fire[Math.floor(Math.random() * fire.length)],
+        life: 0.5 + Math.random() * 0.45,
+        max: 0.95,
+      });
+    }
+    for (let i = 0; i < 16; i++) {
+      const a = Math.random() * TAU;
+      const sp = 30 + Math.random() * 90;
+      P.push({
+        kind: 'smoke',
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - 40,
+        g: -70,
+        drag: 1.5,
+        size: 10 + Math.random() * 10,
+        grow: 34,
+        color: Math.random() < 0.5 ? '#4b4b4b' : '#6b6b6b',
+        life: 1.1 + Math.random() * 0.6,
+        max: 1.7,
+      });
+    }
+    const debrisCol = [this.level?.look?.bikeColor || '#f25c05', '#2d3036', '#8b8f96', this.level?.look?.helmet || '#0d5eaf'];
+    for (let i = 0; i < 12; i++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4;
+      const sp = 180 + Math.random() * 260;
+      P.push({
+        kind: 'debris',
+        x,
+        y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        g: 700,
+        size: 3 + Math.random() * 4,
+        rot: Math.random() * TAU,
+        vr: (Math.random() - 0.5) * 30,
+        bounce: 0.4,
+        color: debrisCol[i % debrisCol.length],
+        life: 1.7,
+        max: 1.7,
+      });
+    }
+    // οι τροχοί φεύγουν προς τα πάνω και αναπηδούν
+    if (bike) {
+      bike.p.slice(0, 2).forEach((w, i) => {
+        P.push({
+          kind: 'wheel',
+          x: w.x,
+          y: w.y,
+          vx: (i ? 1 : -1) * (90 + Math.random() * 80) + bike.velocity.x * 0.3,
+          vy: -320 - Math.random() * 120,
+          g: 760,
+          size: CFG.wheelR,
+          rot: bike.wheelAngle[i],
+          vr: (i ? 1 : -1) * 18,
+          bounce: 0.45,
+          life: 1.75,
+          max: 1.75,
+        });
+      });
+    }
+  }
+
+  drawParticle(p) {
+    const { ctx } = this;
+    const a = Math.max(0, p.life / p.max);
+    switch (p.kind) {
+      case 'ring':
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = '#fff6d5';
+        ctx.lineWidth = 6 * a + 1;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, TAU);
+        ctx.stroke();
+        return;
+      case 'fire':
+      case 'smoke': {
+        ctx.globalAlpha = p.kind === 'fire' ? Math.min(1, a * 1.6) : a * 0.55;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, TAU);
+        ctx.fill();
+        return;
+      }
+      case 'debris':
+        ctx.globalAlpha = Math.min(1, a * 2);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size, -p.size * 0.5, p.size * 2, p.size);
+        ctx.restore();
+        return;
+      case 'wheel': {
+        ctx.globalAlpha = Math.min(1, a * 2.5);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.strokeStyle = '#1b1c1f';
+        ctx.lineWidth = 4.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size - 2.2, 0, TAU);
+        ctx.stroke();
+        ctx.strokeStyle = '#a7adb5';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        for (let k = 0; k < 6; k++) {
+          const s = (k / 6) * TAU;
+          ctx.moveTo(0, 0);
+          ctx.lineTo(Math.cos(s) * (p.size - 5), Math.sin(s) * (p.size - 5));
+        }
+        ctx.stroke();
+        ctx.restore();
+        return;
+      }
+    }
+    ctx.globalAlpha = Math.min(1, a * 1.5);
+    if (p.emoji) {
+      ctx.font = '16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.emoji, p.x, p.y);
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, TAU);
+      ctx.fill();
+    }
   }
 
   // ---- βοηθητικά μετασχηματισμού για parallax ----
@@ -1115,32 +1284,22 @@ export class Renderer {
     const yBottom = this.cam.y + (H - this.ay) / this.z + 40;
 
     this.drawStartSign(L);
+    this.drawJumpSigns(sim, L, x0, x1);
     this.drawGround(L.track, th, x0, x1, yBottom);
     for (const o of L.track.obstacles) {
       if (o.x > x0 - 60 && o.x < x1 + 60) drawObstacle(ctx, o, th, this.time);
     }
     this.drawCheckpoints(sim, L, x0, x1);
     this.drawFinish(sim, L);
-    if (sim) drawBike(ctx, sim.bike, { ...L.look, lean: this.lean });
+    // μετά από έκρηξη η μηχανή «εξαφανίζεται» μέχρι να ξαναβγεί στο checkpoint
+    const exploded = sim && sim.state === 'crashed' && sim.crashReason !== 'water';
+    if (sim && !exploded) drawBike(ctx, sim.bike, { ...L.look, lean: this.lean });
 
-    for (const p of this.particles) {
-      const a = Math.max(0, p.life / p.max);
-      ctx.globalAlpha = Math.min(1, a * 1.5);
-      if (p.emoji) {
-        ctx.font = '16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(p.emoji, p.x, p.y);
-      } else {
-        ctx.fillStyle = p.color;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, TAU);
-        ctx.fill();
-      }
-    }
+    for (const p of this.particles) this.drawParticle(p);
     ctx.globalAlpha = 1;
     for (const f of this.floaters) {
       ctx.globalAlpha = Math.min(1, f.life);
-      ctx.font = 'bold 26px system-ui, sans-serif';
+      ctx.font = `900 ${f.size}px system-ui, sans-serif`;
       ctx.textAlign = 'center';
       ctx.lineWidth = 5;
       ctx.strokeStyle = 'rgba(0,0,0,0.55)';
@@ -1150,6 +1309,10 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
     ctx.restore();
+    if (this.flash > 0) {
+      ctx.fillStyle = `rgba(255, 236, 190, ${this.flash * 0.55})`;
+      ctx.fillRect(0, 0, W, H);
+    }
   }
 
   drawSky(th) {
@@ -1502,6 +1665,41 @@ export class Renderer {
     ctx.textBaseline = 'middle';
     ctx.fillText(name, x, y - 84);
     ctx.textBaseline = 'alphabetic';
+  }
+
+  /** Πινακίδες ⚠️ πριν από κάθε άλμα: εδώ πρέπει να αφήσεις το γκάζι στον αέρα. */
+  drawJumpSigns(sim, L, x0, x1) {
+    const { ctx } = this;
+    for (const j of L.track.jumps || []) {
+      if (j.x < x0 - 60 || j.x > x1 + 60) continue;
+      const gy = sim.world.groundY(j.x);
+      ctx.fillStyle = '#6b7280';
+      ctx.fillRect(j.x - 2, gy - 62, 4, 62);
+      ctx.fillStyle = '#facc15';
+      ctx.strokeStyle = '#1f2937';
+      ctx.lineWidth = 3;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(j.x, gy - 92);
+      ctx.lineTo(j.x + 19, gy - 60);
+      ctx.lineTo(j.x - 19, gy - 60);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#1f2937';
+      ctx.font = '900 20px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(j.water ? '≈' : '!', j.x, gy - 65);
+      if (L.showTips) {
+        ctx.font = 'bold 11px system-ui, sans-serif';
+        const text = 'Άσε το γκάζι στον αέρα!';
+        const w = ctx.measureText(text).width + 12;
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.fillRect(j.x - w / 2, gy - 54, w, 18);
+        ctx.fillStyle = '#b91c1c';
+        ctx.fillText(text, j.x, gy - 41);
+      }
+    }
   }
 
   drawCheckpoints(sim, L, x0, x1) {

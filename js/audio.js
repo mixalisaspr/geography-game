@@ -70,9 +70,16 @@ export class Sound {
     this.tone(330, 0.2, 'square', 0.12);
     this.tone(220, 0.35, 'square', 0.12, 0.15);
   }
-  crash() {
-    this.noise(0.45, 0.35, 700);
-    this.tone(180, 0.3, 'sawtooth', 0.12, 0, 60);
+  explosion() {
+    this.noise(1.1, 0.55, 500);
+    this.noise(0.35, 0.3, 2500, 'bandpass');
+    this.tone(120, 0.6, 'sine', 0.35, 0, 35);
+    this.tone(90, 0.8, 'triangle', 0.25, 0.05, 30);
+  }
+  point() {
+    this.tone(880, 0.1, 'triangle', 0.22);
+    this.tone(1175, 0.12, 'triangle', 0.22, 0.08);
+    this.tone(1568, 0.22, 'triangle', 0.22, 0.16);
   }
   splash() {
     this.noise(0.7, 0.35, 1200, 'bandpass');

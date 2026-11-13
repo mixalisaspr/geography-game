@@ -7,7 +7,7 @@ const KEY = 'geomichani-save-v1';
 
 export function emptySave() {
   return {
-    cities: {}, // cityId → { stars, quiz: bool, bestTime }
+    cities: {}, // cityId → { stars, quiz: bool, points (καλύτερο σκορ), bestTime }
     items: {}, // itemId → timestamp
     completedCountries: [], // με τη σειρά που ολοκληρώθηκαν
     lastCompleted: null,
@@ -91,30 +91,44 @@ export function canPlayCountry(data, countryId) {
 }
 
 /**
- * Καταγράφει αποτέλεσμα πόλης. Επιστρέφει { countryCompleted: bool }.
- * stars: 1..3, quiz: σωστή απάντηση
+ * Πόντοι μιας διαδρομής: +1 για κάθε σωστή απάντηση, −1 για κάθε πτώση.
  */
-export function recordCityResult(data, city, { stars, quiz, time }) {
+export function runPoints(correct, crashes) {
+  return correct - crashes;
+}
+
+/**
+ * Καταγράφει αποτέλεσμα πόλης. Επιστρέφει { countryCompleted, newBest }.
+ * stars: 1..3, quiz: όλες οι ερωτήσεις σωστές, points: πόντοι της διαδρομής
+ */
+export function recordCityResult(data, city, { stars, quiz, time, points = 0 }) {
   const wasDone = isCountryDone(data, city.countryId);
   const prev = data.cities[city.id];
+  const newBest = !prev || prev.points === undefined || points > prev.points;
   data.cities[city.id] = {
     stars: Math.max(stars, prev?.stars || 0),
     quiz: !!(quiz || prev?.quiz),
+    points: newBest ? points : prev.points,
     bestTime: prev?.bestTime ? Math.min(prev.bestTime, time) : time,
   };
   const nowDone = isCountryDone(data, city.countryId);
   if (nowDone && !wasDone) {
     if (!data.completedCountries.includes(city.countryId)) data.completedCountries.push(city.countryId);
     data.lastCompleted = city.countryId;
-    return { countryCompleted: true };
+    return { countryCompleted: true, newBest };
   }
-  return { countryCompleted: false };
+  return { countryCompleted: false, newBest };
 }
 
 export function collectItem(data, itemId) {
   if (data.items[itemId]) return false;
   data.items[itemId] = Date.now();
   return true;
+}
+
+/** Σύνολο πόντων: άθροισμα του καλύτερου σκορ κάθε πόλης. */
+export function totalPoints(data) {
+  return Object.values(data.cities).reduce((s, c) => s + (c.points || 0), 0);
 }
 
 export function totalStars(data) {
