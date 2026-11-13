@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4fb0ef"/>
+      <stop offset="1" stop-color="#1d4f91"/>
+    </linearGradient>
+    <clipPath id="globe"><circle cx="256" cy="220" r="150"/></clipPath>
+  </defs>
+  <rect width="512" height="512" rx="110" fill="url(#bg)"/>
+  <circle cx="256" cy="220" r="150" fill="#7fc8f2"/>
+  <g clip-path="url(#globe)" fill="#8fb75a">
+    <path d="M140 120c40-30 90-20 110 10s-10 60 20 80 70 0 80 40-40 70-90 60-60-50-100-50-60-40-50-80 10-40 30-60z"/>
+    <path d="M330 90c30 0 70 30 70 60s-30 30-50 20-50-20-40-50 0-30 20-30z"/>
+  </g>
+  <g fill="none" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5">
+    <circle cx="256" cy="220" r="150"/>
+    <ellipse cx="256" cy="220" rx="70" ry="150"/>
+    <path d="M106 220h300M128 145h256M128 295h256"/>
+  </g>
+  <rect x="40" y="398" width="432" height="22" rx="11" fill="#2c2f36"/>
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="170" cy="362" r="42" fill="none" stroke="#1b1c1f" stroke-width="16"/>
+    <circle cx="350" cy="362" r="42" fill="none" stroke="#1b1c1f" stroke-width="16"/>
+    <path d="M170 362l60-40h70l50 40" fill="none" stroke="#3b3f46" stroke-width="14"/>
+    <path d="M205 318l40-26 70-6 20 30-50 18z" fill="#f25c05"/>
+    <path d="M350 362l-30-80" stroke="#c9ccd1" stroke-width="12"/>
+    <path d="M320 282l-12-16" stroke="#2a2c30" stroke-width="10"/>
+    <path d="M232 300l-6-46 34-22" fill="none" stroke="#1f4e79" stroke-width="22"/>
+    <circle cx="268" cy="214" r="22" fill="#0d5eaf"/>
+    <path d="M260 236l44 34" stroke="#1f4e79" stroke-width="12"/>
+  </g>
+</svg>

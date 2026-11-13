@@ -1,0 +1,750 @@
+// Οθόνες και παράθυρα (DOM): αρχική, χάρτης, συλλογή, popups πίστας, αποτελέσματα.
+// Εδώ βρίσκεται και η «ροή» του παιχνιδιού (τι ανοίγει μετά από τι).
+
+import { COUNTRIES, COUNTRY_IDS, START_COUNTRY, allItems, getCity } from './data/countries.js';
+import {
+  availableCountries,
+  canPlayCountry,
+  collectItem,
+  countryState,
+  isCityDone,
+  isCityUnlocked,
+  isCountryDone,
+  nextCity,
+  recordCityResult,
+  totalStars,
+  writeSave,
+} from './progress.js';
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = (s) =>
+  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+/** «την Ελλάδα», «τη Βουλγαρία», «το Μαυροβούνιο» */
+export function accusative(country) {
+  if (country.id === 'montenegro') return `το ${country.name}`;
+  const keepN = /^[ΑΆΕΈΗΉΙΊΟΌΥΎΩΏΚΠΤΞΨ]|^(ΓΚ|ΜΠ|ΝΤ|ΤΣ|ΤΖ)/i.test(country.name.toUpperCase());
+  return `${keepN ? 'την' : 'τη'} ${country.name}`;
+}
+
+function starsHtml(n, max = 3) {
+  let s = '';
+  for (let i = 0; i < max; i++) s += `<span class="star ${i < n ? 'on' : ''}">★</span>`;
+  return s;
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function fmtTime(t) {
+  const m = Math.floor(t / 60);
+  const s = Math.floor(t % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+export class UI {
+  constructor({ game, sound, data }) {
+    this.game = game;
+    this.sound = sound;
+    this.data = data;
+    this.run = null; // στοιχεία της τρέχουσας διαδρομής
+    this.screens = {
+      home: $('#screen-home'),
+      map: $('#screen-map'),
+      collection: $('#screen-collection'),
+    };
+    this.hud = $('#hud');
+    this.modal = $('#modal');
+    this.modalBox = $('#modal .modal-box');
+
+    this.bindControls();
+    this.bindGameEvents();
+    this.sound.setMuted(!!data.muted);
+    this.showHome();
+  }
+
+  save() {
+    writeSave(this.data);
+  }
+
+  // ---------------- οθόνες ----------------
+  showScreen(name) {
+    for (const [k, el] of Object.entries(this.screens)) el.hidden = k !== name;
+    this.hud.hidden = name !== null;
+    document.body.dataset.screen = name || 'play';
+  }
+
+  showHome() {
+    this.closeModal();
+    this.showScreen('home');
+    // demo στο φόντο: η τελευταία πόλη που παίχτηκε ή η Αθήνα
+    const demoCity = getCity(this.data.lastCity || 'athens') || getCity('athens');
+    this.game.load(demoCity, 'demo');
+    const items = allItems();
+    const got = items.filter((i) => this.data.items[i.id]).length;
+    const doneCountries = COUNTRY_IDS.filter((id) => isCountryDone(this.data, id)).length;
+    const el = this.screens.home;
+    el.innerHTML = `
+      <div class="home-card">
+        <div class="logo">
+          <span class="logo-bike">🏍️</span>
+          <h1>ΓεωΜηχανή</h1>
+          <p class="tagline">Ταξίδεψε με τη μηχανή σου από χώρα σε χώρα!</p>
+        </div>
+        <div class="home-stats">
+          <span>🌍 ${doneCountries}/${COUNTRY_IDS.length} χώρες</span>
+          <span>🎒 ${got}/${items.length} αντικείμενα</span>
+          <span>⭐ ${totalStars(this.data)}</span>
+        </div>
+        <button class="btn big primary" data-act="play">▶ Παίξε</button>
+        <div class="row">
+          <button class="btn" data-act="collection">🎒 Συλλογή</button>
+          <button class="btn" data-act="help">❓ Πώς παίζεται</button>
+          <button class="btn icon" data-act="mute" aria-label="Ήχος">${this.data.muted ? '🔇' : '🔊'}</button>
+        </div>
+      </div>`;
+    el.onclick = (ev) => {
+      const act = ev.target.closest('[data-act]')?.dataset.act;
+      if (!act) return;
+      this.sound.unlock();
+      this.sound.click();
+      if (act === 'play') {
+        this.goFullscreen();
+        if (!this.data.seenHelp) this.showHelp(() => this.showMap());
+        else this.showMap();
+      } else if (act === 'collection') this.showCollection();
+      else if (act === 'help') this.showHelp();
+      else if (act === 'mute') {
+        this.data.muted = !this.data.muted;
+        this.sound.setMuted(this.data.muted);
+        this.save();
+        ev.target.closest('[data-act]').textContent = this.data.muted ? '🔇' : '🔊';
+      }
+    };
+  }
+
+  goFullscreen() {
+    const touch = matchMedia('(pointer: coarse)').matches;
+    if (!touch || document.fullscreenElement) return;
+    const el = document.documentElement;
+    const p = el.requestFullscreen?.({ navigationUI: 'hide' });
+    p?.then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+  }
+
+  // ---------------- χάρτης ----------------
+  showMap(focusId = null) {
+    this.closeModal();
+    this.game.stop();
+    this.showScreen('map');
+    const data = this.data;
+    const avail = availableCountries(data);
+    const pos = Object.fromEntries(COUNTRY_IDS.map((id) => [id, COUNTRIES[id].map]));
+    // ακμές (σύνορα)
+    let edges = '';
+    const seen = new Set();
+    for (const a of COUNTRY_IDS)
+      for (const b of COUNTRIES[a].neighbors) {
+        const key = [a, b].sort().join('|');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const sa = countryState(data, a);
+        const sb = countryState(data, b);
+        let cls = 'locked';
+        if (sa === 'done' && sb === 'done') cls = 'done';
+        else if ((sa === 'done' && sb === 'available') || (sb === 'done' && sa === 'available')) cls = 'open';
+        const A = pos[a];
+        const B = pos[b];
+        edges += `<line class="edge ${cls}" x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}"/>`;
+      }
+    let nodes = '';
+    for (const id of COUNTRY_IDS) {
+      const c = COUNTRIES[id];
+      const st = countryState(data, id);
+      const p = pos[id];
+      const doneCities = c.cities.filter((x) => isCityDone(data, x.id)).length;
+      const stripes = c.colors
+        .map((col, i) => `<rect x="-40" y="${-40 + (80 / c.colors.length) * i}" width="80" height="${80 / c.colors.length + 1}" fill="${col}"/>`)
+        .join('');
+      nodes += `
+        <g class="node ${st} ${focusId === id ? 'focus' : ''}" data-id="${id}" transform="translate(${p.x} ${p.y})" tabindex="0" role="button" aria-label="${esc(c.name)}">
+          <circle class="halo" r="54"/>
+          <clipPath id="clip-${id}"><circle r="40"/></clipPath>
+          <g clip-path="url(#clip-${id})" class="stripes">${stripes}</g>
+          <circle class="ring" r="40"/>
+          <text class="flag" y="12">${c.flag}</text>
+          <text class="cname" y="68">${esc(c.name)}</text>
+          ${st === 'locked' ? '<text class="lock" x="30" y="-26">🔒</text>' : ''}
+          ${st === 'done' ? '<text class="lock" x="30" y="-26">✅</text>' : ''}
+          ${st !== 'locked' && doneCities < c.cities.length ? `<text class="cprog" y="90">${doneCities}/${c.cities.length} πόλεις</text>` : ''}
+        </g>`;
+    }
+    const last = data.lastCompleted ? COUNTRIES[data.lastCompleted] : null;
+    const hint = !last
+      ? `Το ταξίδι ξεκινά από την <b>Ελλάδα</b> 🇬🇷 – πάτησέ την!`
+      : avail.length
+        ? `Ολοκλήρωσες ${esc(accusative(last))}! Διάλεξε μια χώρα που <b>συνορεύει</b> μαζί της.`
+        : `Συγχαρητήρια! Ολοκλήρωσες όλες τις χώρες! 🏆`;
+    const items = allItems();
+    const got = items.filter((i) => data.items[i.id]).length;
+    const el = this.screens.map;
+    el.innerHTML = `
+      <header class="bar">
+        <button class="btn icon" data-act="home" aria-label="Πίσω">⬅</button>
+        <div class="bar-title">
+          <h2>Χάρτης ταξιδιού</h2>
+          <p class="hint">${hint}</p>
+        </div>
+        <button class="btn" data-act="collection">🎒 ${got}/${items.length}</button>
+      </header>
+      <div class="map-wrap">
+        <svg class="map" viewBox="0 0 1200 710" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <radialGradient id="sea" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#bfe3f7"/><stop offset="1" stop-color="#9fd2ef"/></radialGradient>
+          </defs>
+          <ellipse class="sea" cx="770" cy="700" rx="200" ry="120"/>
+          <ellipse class="sea" cx="330" cy="720" rx="140" ry="110"/>
+          <ellipse class="sea" cx="150" cy="470" rx="90" ry="210" transform="rotate(-35 150 470)"/>
+          <ellipse class="sea" cx="1010" cy="310" rx="150" ry="120"/>
+          <text class="sea-label" x="820" y="660">Αιγαίο</text>
+          <text class="sea-label" x="300" y="680">Ιόνιο</text>
+          <text class="sea-label" x="150" y="480" transform="rotate(55 150 480)">Αδριατική</text>
+          <text class="sea-label" x="1010" y="300">Μαύρη Θάλασσα</text>
+          ${edges}
+          ${nodes}
+        </svg>
+      </div>`;
+    el.onclick = (ev) => {
+      const act = ev.target.closest('[data-act]')?.dataset.act;
+      if (act) {
+        this.sound.click();
+        if (act === 'home') this.showHome();
+        if (act === 'collection') this.showCollection();
+        return;
+      }
+      const node = ev.target.closest('.node');
+      if (node) {
+        this.sound.click();
+        this.openCountry(node.dataset.id);
+      }
+    };
+    el.onkeydown = (ev) => {
+      if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.classList?.contains('node')) {
+        ev.preventDefault();
+        this.openCountry(ev.target.dataset.id);
+      }
+    };
+  }
+
+  openCountry(id) {
+    const c = COUNTRIES[id];
+    const data = this.data;
+    const st = countryState(data, id);
+    const playable = canPlayCountry(data, id);
+    const neighbors = c.neighbors.map((n) => `<span class="chip">${COUNTRIES[n].flag} ${esc(COUNTRIES[n].name)}</span>`).join('');
+    const cities = c.cities
+      .map((city) => {
+        const done = isCityDone(data, city.id);
+        const unlocked = playable && isCityUnlocked(data, city);
+        const stars = data.cities[city.id]?.stars || 0;
+        return `<button class="city ${done ? 'done' : ''}" data-city="${city.id}" ${unlocked ? '' : 'disabled'}>
+            <span class="city-num">${city.index + 1}</span>
+            <span class="city-name">${esc(city.name)}</span>
+            <span class="city-items">${city.items.map((i) => (data.items[i.id] ? i.emoji : '❔')).join(' ')}</span>
+            <span class="city-stars">${unlocked ? (done ? starsHtml(stars) : '▶') : '🔒'}</span>
+          </button>`;
+      })
+      .join('');
+    let lockMsg = '';
+    if (!playable) {
+      const last = data.lastCompleted ? COUNTRIES[data.lastCompleted] : COUNTRIES[START_COUNTRY];
+      lockMsg = data.lastCompleted
+        ? `<p class="lockmsg">🔒 Μπορείς να πας μόνο σε χώρες που συνορεύουν με ${esc(accusative(last))}, τη χώρα που ολοκλήρωσες τελευταία.</p>`
+        : `<p class="lockmsg">🔒 Πρώτα ολοκλήρωσε την Ελλάδα!</p>`;
+    }
+    const next = playable ? nextCity(data, id) : null;
+    this.openModal(
+      `<div class="sheet-grid">
+        <div class="col">
+          <div class="country-head">
+            <span class="big-flag">${c.flag}</span>
+            <div>
+              <h2>${esc(c.name)}</h2>
+              <p class="muted">${st === 'done' ? '✅ Ολοκληρώθηκε' : st === 'available' ? 'Διαθέσιμη' : 'Κλειδωμένη'}</p>
+            </div>
+          </div>
+          <dl class="facts">
+            <dt>Πρωτεύουσα</dt><dd>${esc(c.capital)}</dd>
+            <dt>Γλώσσα</dt><dd>${esc(c.language)}</dd>
+            <dt>Νόμισμα</dt><dd>${esc(c.currency)}</dd>
+          </dl>
+          <p class="intro">${esc(c.intro)}</p>
+          <p class="label">Συνορεύει με:</p>
+          <div class="chips">${neighbors}</div>
+        </div>
+        <div class="col">
+          ${lockMsg}
+          <p class="label first">Πίστες:</p>
+          <div class="cities">${cities}</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" data-act="close">Κλείσιμο</button>
+        ${next ? `<button class="btn primary" data-city="${next.id}">▶ ${esc(next.name)}</button>` : ''}
+      </div>`,
+      (ev) => {
+        const cityBtn = ev.target.closest('[data-city]');
+        if (cityBtn && !cityBtn.disabled) {
+          this.sound.click();
+          this.startCity(getCity(cityBtn.dataset.city));
+          return;
+        }
+        if (ev.target.closest('[data-act="close"]')) {
+          this.sound.click();
+          this.closeModal();
+        }
+      },
+      'sheet',
+    );
+  }
+
+  // ---------------- συλλογή ----------------
+  showCollection() {
+    this.closeModal();
+    this.game.stop();
+    this.showScreen('collection');
+    const data = this.data;
+    const items = allItems();
+    const got = items.filter((i) => data.items[i.id]).length;
+    let html = `
+      <header class="bar">
+        <button class="btn icon" data-act="back" aria-label="Πίσω">⬅</button>
+        <div class="bar-title"><h2>Η συλλογή μου</h2><p class="hint">🎒 ${got} από ${items.length} αντικείμενα</p></div>
+        <button class="btn" data-act="map">🗺️ Χάρτης</button>
+      </header><div class="collection">`;
+    for (const id of COUNTRY_IDS) {
+      const c = COUNTRIES[id];
+      const cItems = c.cities.flatMap((x) => x.items);
+      const n = cItems.filter((i) => data.items[i.id]).length;
+      html += `<section><h3>${c.flag} ${esc(c.name)} <span class="muted">${n}/${cItems.length}</span></h3><div class="grid">`;
+      for (const it of cItems) {
+        const has = !!data.items[it.id];
+        html += has
+          ? `<button class="item" data-item="${it.id}"><span class="emoji">${it.emoji}</span><span class="iname">${esc(it.name)}</span></button>`
+          : `<div class="item locked"><span class="emoji">❔</span><span class="iname">${esc(getCity(it.cityId).name)}</span></div>`;
+      }
+      html += `</div></section>`;
+    }
+    html += `</div>`;
+    const el = this.screens.collection;
+    el.innerHTML = html;
+    el.onclick = (ev) => {
+      const act = ev.target.closest('[data-act]')?.dataset.act;
+      if (act === 'back') {
+        this.sound.click();
+        this.showHome();
+        return;
+      }
+      if (act === 'map') {
+        this.sound.click();
+        this.showMap();
+        return;
+      }
+      const b = ev.target.closest('[data-item]');
+      if (b) {
+        this.sound.click();
+        const it = items.find((i) => i.id === b.dataset.item);
+        const city = getCity(it.cityId);
+        this.openModal(
+          `<div class="item-card">
+            <div class="item-emoji">${it.emoji}</div>
+            <div class="item-text">
+              <h2>${esc(it.name)}</h2>
+              <p class="muted">${COUNTRIES[it.countryId].flag} ${esc(city.name)}, ${esc(COUNTRIES[it.countryId].name)}</p>
+              <p>${esc(it.desc)}</p>
+            </div>
+          </div>
+          <div class="actions"><button class="btn primary" data-act="close">OK</button></div>`,
+          (e) => e.target.closest('[data-act="close"]') && this.closeModal(),
+        );
+      }
+    };
+  }
+
+  showHelp(after) {
+    this.data.seenHelp = true;
+    this.save();
+    this.openModal(
+      `<h2>Πώς παίζεται</h2>
+      <div class="help">
+        <div class="help-row"><span class="key">▶</span><p><b>Γκάζι</b> (δεξιά πλευρά της οθόνης ή →): η μηχανή προχωράει. Στον αέρα γέρνει <b>πίσω</b>.</p></div>
+        <div class="help-row"><span class="key">◀</span><p><b>Φρένο</b> (αριστερή πλευρά ή ←): φρενάρει / κάνει όπισθεν. Στον αέρα γέρνει <b>μπροστά</b>.</p></div>
+        <div class="help-row"><span class="key">🚩</span><p>Στα <b>checkpoints</b> μαζεύεις αντικείμενα της χώρας και μαθαίνεις κάτι καινούργιο. Αν πέσεις, συνεχίζεις από το τελευταίο checkpoint.</p></div>
+        <div class="help-row"><span class="key">❓</span><p>Στη μέση της πίστας σε περιμένει μια <b>ερώτηση</b>. Η σωστή απάντηση σού δίνει ένα αστέρι!</p></div>
+        <div class="help-row"><span class="key">🗺️</span><p>Όταν τελειώσεις όλες τις πόλεις μιας χώρας, μπορείς να πας μόνο σε μια χώρα που <b>συνορεύει</b> μαζί της.</p></div>
+        <div class="help-row"><span class="key">⚠️</span><p>Μην πέσεις με το κεφάλι και πρόσεχε τη θάλασσα και τα ποτάμια!</p></div>
+      </div>
+      <div class="actions"><button class="btn primary" data-act="ok">Κατάλαβα!</button></div>`,
+      (ev) => {
+        if (ev.target.closest('[data-act="ok"]')) {
+          this.sound.click();
+          this.closeModal();
+          after?.();
+        }
+      },
+    );
+  }
+
+  // ---------------- πίστα ----------------
+  startCity(city) {
+    this.closeModal();
+    const country = COUNTRIES[city.countryId];
+    this.data.lastCity = city.id;
+    this.save();
+    this.showScreen(null);
+    this.hud.hidden = false;
+    this.run = { city, quiz: null, items: [] };
+    this.game.load(city, 'play');
+    this.game.pause();
+    $('#hud-city').textContent = `${country.flag} ${city.name}`;
+    this.updateBag();
+    this.renderProgressMarkers();
+    this.openModal(
+      `<div class="level-intro">
+        <p class="muted">${country.flag} ${esc(country.name)} · Πόλη ${city.index + 1}/${country.cities.length}</p>
+        <h2>${esc(city.name)}</h2>
+        <p>${esc(city.intro)}</p>
+        <p class="label">Θα βρεις στη διαδρομή:</p>
+        <div class="to-find">${city.items.map((i) => `<span>${i.emoji}</span>`).join('')}<span>❓</span></div>
+      </div>
+      <div class="actions"><button class="btn" data-act="map">🗺️ Χάρτης</button><button class="btn primary big" data-act="go">Πάμε! 🏍️</button></div>`,
+      (ev) => {
+        const act = ev.target.closest('[data-act]')?.dataset.act;
+        if (act === 'go') {
+          this.sound.unlock();
+          this.sound.click();
+          this.closeModal();
+          this.game.resume();
+        } else if (act === 'map') this.showMap(city.countryId);
+      },
+    );
+  }
+
+  updateBag() {
+    const city = this.run?.city;
+    if (!city) return;
+    const n = city.items.filter((i) => this.data.items[i.id]).length;
+    $('#hud-bag').textContent = `🎒 ${n}/${city.items.length}`;
+  }
+
+  renderProgressMarkers() {
+    const sim = this.game.sim;
+    const span = sim.track.finishX - sim.track.startX;
+    const labels = this.game.renderer.level.checkpointLabels;
+    $('#hud-markers').innerHTML = sim.track.checkpoints
+      .map((x, i) => `<span class="marker" data-i="${i}" style="left:${((x - sim.track.startX) / span) * 100}%">${labels[i]}</span>`)
+      .join('');
+  }
+
+  onCheckpoint(index) {
+    const city = this.run.city;
+    $(`#hud-markers .marker[data-i="${index}"]`)?.classList.add('done');
+    if (index === 1) return this.showQuiz(city);
+    const item = city.items[index === 0 ? 0 : 1];
+    const fact = city.facts[index === 0 ? 0 : 1];
+    const isNew = collectItem(this.data, item.id);
+    this.run.items.push(item);
+    this.save();
+    this.updateBag();
+    this.sound.pickup();
+    this.openModal(
+      `<div class="item-card">
+        <div class="item-emoji pop">${item.emoji}</div>
+        <div class="item-text">
+          <p class="muted">Checkpoint ${index + 1}/3 ${isNew ? '· <b class="new">ΝΕΟ!</b>' : ''}</p>
+          <h2>Μάζεψες: ${esc(item.name)}</h2>
+          <p>${esc(item.desc)}</p>
+        </div>
+      </div>
+      <div class="did-you-know"><b>📖 Ήξερες ότι…</b><p>${esc(fact)}</p></div>
+      <div class="actions"><button class="btn primary big" data-act="go">Συνέχεια ▶</button></div>`,
+      (ev) => {
+        if (ev.target.closest('[data-act="go"]')) {
+          this.sound.click();
+          this.closeModal();
+          this.game.resume();
+        }
+      },
+    );
+  }
+
+  showQuiz(city) {
+    const q = city.quiz;
+    const correct = q.options[0];
+    const opts = shuffle(q.options);
+    this.openModal(
+      `<div class="quiz">
+        <p class="muted">Checkpoint 2/3 · Ερώτηση</p>
+        <h2>❓ ${esc(q.q)}</h2>
+        <div class="answers">${opts.map((o) => `<button class="btn answer" data-a="${esc(o)}">${esc(o)}</button>`).join('')}</div>
+        <div class="feedback" hidden></div>
+      </div>
+      <div class="actions"><button class="btn primary big" data-act="go" hidden>Συνέχεια ▶</button></div>`,
+      (ev) => {
+        const a = ev.target.closest('.answer');
+        if (a && this.run.quiz === null) {
+          const ok = a.dataset.a === correct;
+          this.run.quiz = ok;
+          ok ? this.sound.correct() : this.sound.wrong();
+          for (const b of this.modalBox.querySelectorAll('.answer')) {
+            b.disabled = true;
+            if (b.dataset.a === correct) b.classList.add('right');
+            else if (b === a) b.classList.add('wrong');
+          }
+          const fb = $('.feedback', this.modalBox);
+          fb.hidden = false;
+          fb.className = `feedback ${ok ? 'ok' : 'bad'}`;
+          fb.innerHTML = `<b>${ok ? '✅ Σωστά! +1 ⭐' : `❌ Η σωστή απάντηση: ${esc(correct)}`}</b><p>${esc(q.explain)}</p>`;
+          $('[data-act="go"]', this.modalBox).hidden = false;
+          this.modalBox.scrollTo({ top: this.modalBox.scrollHeight, behavior: 'smooth' });
+          return;
+        }
+        if (ev.target.closest('[data-act="go"]')) {
+          this.sound.click();
+          this.closeModal();
+          this.game.resume();
+        }
+      },
+    );
+  }
+
+  onFinish({ time, crashes }) {
+    const city = this.run.city;
+    const country = COUNTRIES[city.countryId];
+    const quizOk = !!this.run.quiz;
+    const stars = 1 + (quizOk ? 1 : 0) + (crashes <= 1 ? 1 : 0);
+    const { countryCompleted } = recordCityResult(this.data, city, { stars, quiz: quizOk, time });
+    this.save();
+    this.game.pause();
+    const nextInCountry = country.cities[city.index + 1];
+    this.openModal(
+      `<div class="results">
+        <p class="muted">${country.flag} ${esc(country.name)}</p>
+        <h2>🏁 Τερμάτισες! – ${esc(city.name)}</h2>
+        <div class="big-stars">${starsHtml(stars)}</div>
+        <ul class="star-reasons">
+          <li class="on">★ Τερμάτισες τη διαδρομή</li>
+          <li class="${quizOk ? 'on' : ''}">★ Σωστή απάντηση στην ερώτηση</li>
+          <li class="${crashes <= 1 ? 'on' : ''}">★ Το πολύ 1 πτώση (είχες ${crashes})</li>
+        </ul>
+        <p>⏱️ Χρόνος: <b>${fmtTime(time)}</b></p>
+        <p class="label">Μάζεψες:</p>
+        <div class="to-find">${city.items.map((i) => `<span title="${esc(i.name)}">${i.emoji}</span>`).join('')}</div>
+      </div>
+      <div class="actions">
+        <button class="btn" data-act="again">↻ Ξανά</button>
+        <button class="btn" data-act="map">🗺️ Χάρτης</button>
+        ${!countryCompleted && nextInCountry ? `<button class="btn primary" data-act="next">▶ ${esc(nextInCountry.name)}</button>` : ''}
+        ${countryCompleted ? `<button class="btn primary" data-act="country">Συνέχεια ▶</button>` : ''}
+      </div>`,
+      (ev) => {
+        const act = ev.target.closest('[data-act]')?.dataset.act;
+        if (!act) return;
+        this.sound.click();
+        if (act === 'again') this.startCity(city);
+        else if (act === 'map') this.showMap(city.countryId);
+        else if (act === 'next') this.startCity(nextInCountry);
+        else if (act === 'country') this.showCountryComplete(country);
+      },
+    );
+  }
+
+  showCountryComplete(country) {
+    const avail = availableCountries(this.data);
+    const items = country.cities.flatMap((c) => c.items);
+    this.openModal(
+      `<div class="results">
+        <div class="confetti">🎉</div>
+        <h2>Ολοκλήρωσες ${esc(accusative(country))}! ${country.flag}</h2>
+        <p>Μάζεψες ${items.filter((i) => this.data.items[i.id]).length} από ${items.length} αντικείμενα:</p>
+        <div class="to-find">${items.map((i) => `<span>${this.data.items[i.id] ? i.emoji : '❔'}</span>`).join('')}</div>
+        ${
+          avail.length
+            ? `<p class="label">Τώρα μπορείς να ταξιδέψεις σε μια χώρα που συνορεύει με ${esc(accusative(country))}:</p>
+               <div class="chips">${avail.map((id) => `<button class="chip btn" data-country="${id}">${COUNTRIES[id].flag} ${esc(COUNTRIES[id].name)}</button>`).join('')}</div>`
+            : `<p><b>🏆 Ολοκλήρωσες ολόκληρο το ταξίδι! Είσαι πραγματικός εξερευνητής!</b></p>`
+        }
+      </div>
+      <div class="actions"><button class="btn primary big" data-act="map">🗺️ Στον χάρτη</button></div>`,
+      (ev) => {
+        const cBtn = ev.target.closest('[data-country]');
+        if (cBtn) {
+          this.sound.click();
+          this.showMap(cBtn.dataset.country);
+          this.openCountry(cBtn.dataset.country);
+          return;
+        }
+        if (ev.target.closest('[data-act="map"]')) {
+          this.sound.click();
+          this.showMap();
+        }
+      },
+    );
+  }
+
+  showPause() {
+    if (this.game.mode !== 'play' || this.modal.classList.contains('open')) return;
+    this.game.pause();
+    this.openModal(
+      `<h2>⏸ Παύση</h2>
+      <p class="muted">${COUNTRIES[this.run.city.countryId].flag} ${esc(this.run.city.name)}</p>
+      <div class="stack">
+        <button class="btn primary big" data-act="resume">▶ Συνέχεια</button>
+        <button class="btn" data-act="restart">↻ Από την αρχή</button>
+        <button class="btn" data-act="help">❓ Πώς παίζεται</button>
+        <button class="btn" data-act="mute">${this.data.muted ? '🔇 Ήχος: κλειστός' : '🔊 Ήχος: ανοιχτός'}</button>
+        <button class="btn" data-act="map">🗺️ Έξοδος στον χάρτη</button>
+      </div>`,
+      (ev) => {
+        const act = ev.target.closest('[data-act]')?.dataset.act;
+        if (!act) return;
+        this.sound.click();
+        if (act === 'resume') {
+          this.closeModal();
+          this.game.resume();
+        } else if (act === 'restart') this.startCity(this.run.city);
+        else if (act === 'help') this.showHelp(() => this.showPause());
+        else if (act === 'mute') {
+          this.data.muted = !this.data.muted;
+          this.sound.setMuted(this.data.muted);
+          this.save();
+          ev.target.textContent = this.data.muted ? '🔇 Ήχος: κλειστός' : '🔊 Ήχος: ανοιχτός';
+        } else if (act === 'map') this.showMap(this.run.city.countryId);
+      },
+    );
+  }
+
+  // ---------------- modal ----------------
+  openModal(html, onClick, variant = '') {
+    this.modalBox.className = `modal-box ${variant}`;
+    this.modalBox.innerHTML = html;
+    this.modalBox.onclick = onClick;
+    this.modal.classList.add('open');
+    this.modal.hidden = false;
+    this.modalBox.scrollTop = 0;
+    const focusable = this.modalBox.querySelector('.btn.primary, .answer, .btn');
+    focusable?.focus({ preventScroll: true });
+  }
+
+  closeModal() {
+    this.modal.classList.remove('open');
+    this.modal.hidden = true;
+    this.modalBox.innerHTML = '';
+    this.modalBox.onclick = null;
+  }
+
+  // ---------------- χειρισμός ----------------
+  bindControls() {
+    const input = this.game.input;
+    const layer = $('#touch-layer');
+    const pointers = new Map();
+    const gasBtn = $('#pedal-gas');
+    const brakeBtn = $('#pedal-brake');
+    const refresh = () => {
+      const vals = [...pointers.values()];
+      input.gas = vals.includes('gas') || this.keys.gas;
+      input.brake = vals.includes('brake') || this.keys.brake;
+      gasBtn.classList.toggle('active', input.gas);
+      brakeBtn.classList.toggle('active', input.brake);
+    };
+    this.keys = { gas: false, brake: false };
+    const down = (ev) => {
+      if (this.game.mode !== 'play' || this.game.paused) return;
+      ev.preventDefault();
+      this.sound.unlock();
+      const side = ev.clientX < window.innerWidth / 2 ? 'brake' : 'gas';
+      pointers.set(ev.pointerId, side);
+      try {
+        layer.setPointerCapture?.(ev.pointerId);
+      } catch {
+        /* μερικοί browsers δεν το επιτρέπουν – δεν πειράζει */
+      }
+      refresh();
+    };
+    const up = (ev) => {
+      pointers.delete(ev.pointerId);
+      refresh();
+    };
+    layer.addEventListener('pointerdown', down);
+    layer.addEventListener('pointerup', up);
+    layer.addEventListener('pointercancel', up);
+    layer.addEventListener('lostpointercapture', up);
+    layer.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    const keyMap = {
+      ArrowRight: 'gas',
+      ArrowUp: 'gas',
+      KeyD: 'gas',
+      KeyW: 'gas',
+      ArrowLeft: 'brake',
+      ArrowDown: 'brake',
+      KeyA: 'brake',
+      KeyS: 'brake',
+    };
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Escape' || e.code === 'KeyP') {
+        if (this.game.mode === 'play' && !this.game.paused) this.showPause();
+        return;
+      }
+      const k = keyMap[e.code];
+      if (!k || this.game.mode !== 'play') return;
+      e.preventDefault();
+      this.sound.unlock();
+      this.keys[k] = true;
+      refresh();
+    });
+    window.addEventListener('keyup', (e) => {
+      const k = keyMap[e.code];
+      if (!k) return;
+      this.keys[k] = false;
+      refresh();
+    });
+    this.resetInput = () => {
+      pointers.clear();
+      this.keys.gas = this.keys.brake = false;
+      refresh();
+    };
+
+    $('#btn-pause').addEventListener('click', () => {
+      this.sound.click();
+      this.showPause();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (this.game.mode === 'play' && !this.game.paused) this.showPause();
+        this.sound.ctx?.suspend?.();
+      } else this.sound.ctx?.resume?.();
+    });
+  }
+
+  bindGameEvents() {
+    const g = this.game;
+    g.on('checkpoint', (i) => {
+      this.resetInput();
+      this.onCheckpoint(i);
+    });
+    g.on('finish', (stats) => {
+      this.resetInput();
+      this.onFinish(stats);
+    });
+    g.on('progress', (p) => {
+      const bar = $('#hud-progress');
+      if (bar) bar.style.width = `${p * 100}%`;
+    });
+  }
+}

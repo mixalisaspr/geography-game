@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="el">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#1d4f91" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ΓεωΜηχανή" />
+    <meta name="description" content="Παιχνίδι γεωγραφίας για κινητά: οδήγησε μια μηχανή σε πίστες από χώρα σε χώρα, μάζεψε αντικείμενα και μάθε για κάθε τόπο." />
+    <title>ΓεωΜηχανή</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-180.png" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body data-screen="home">
+    <canvas id="game" aria-hidden="true"></canvas>
+
+    <!-- επιφάνεια αφής για γκάζι/φρένο (αριστερά = φρένο, δεξιά = γκάζι) -->
+    <div id="touch-layer"></div>
+
+    <div id="hud" hidden>
+      <div class="hud-top">
+        <button id="btn-pause" class="btn icon" aria-label="Παύση">⏸</button>
+        <div class="hud-mid">
+          <div id="hud-city" class="hud-city"></div>
+          <div class="progress">
+            <div id="hud-progress" class="progress-bar"></div>
+            <div id="hud-markers"></div>
+            <span class="finish-flag">🏁</span>
+          </div>
+        </div>
+        <div id="hud-bag" class="hud-bag">🎒 0/2</div>
+      </div>
+      <div class="pedals" aria-hidden="true">
+        <div id="pedal-brake" class="pedal brake"><span>◀</span><small>Φρένο</small></div>
+        <div id="pedal-gas" class="pedal gas"><span>▶</span><small>Γκάζι</small></div>
+      </div>
+      <div class="rotate-hint">📱↻ Γύρισε το κινητό οριζόντια για καλύτερη θέα</div>
+    </div>
+
+    <main id="screen-home" class="screen home"></main>
+    <main id="screen-map" class="screen map-screen" hidden></main>
+    <main id="screen-collection" class="screen collection-screen" hidden></main>
+
+    <div id="modal" class="modal" hidden>
+      <div class="modal-box" role="dialog" aria-modal="true"></div>
+    </div>
+
+    <noscript>Το παιχνίδι χρειάζεται JavaScript.</noscript>
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
