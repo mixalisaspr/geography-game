@@ -6,6 +6,7 @@ import { generateTrack } from '../js/track.js';
 import { trackForCity } from '../js/levels.js';
 import { LevelSim, autopilot } from '../js/physics.js';
 import { LANDMARKS } from '../js/render.js';
+import { finalQuiz } from '../js/ui.js';
 import {
   availableCountries,
   canPlayCountry,
@@ -57,10 +58,12 @@ test('κάθε πόλη έχει πλήρες περιεχόμενο και έγ
       assert.ok(it.fact && it.fact !== it.desc, `${city.id}: το αντικείμενο «${it.name}» χρειάζεται δική του πληροφορία`);
     }
     assert.equal(city.facts, undefined, `${city.id}: οι πληροφορίες ανήκουν στα αντικείμενα`);
-    assert.equal(city.quizzes.length, 2, `${city.id}: χρειάζονται 2 ερωτήσεις`);
-    assert.notEqual(city.quizzes[0].q, city.quizzes[1].q, `${city.id}: ίδια ερώτηση δύο φορές`);
-    for (const q of city.quizzes) {
-      assert.ok(q.q && q.explain, `${city.id}: ελλιπής ερώτηση`);
+    assert.equal(city.infos.length, 2, `${city.id}: χρειάζονται 2 πληροφορίες για τη διαδρομή`);
+    const qs = [...city.items.map((i) => i.quiz), ...city.infos.map((i) => i.quiz)];
+    for (const info of city.infos) assert.ok(info.text, `${city.id}: κενή πληροφορία`);
+    assert.equal(new Set(qs.map((q) => q.q)).size, 4, `${city.id}: ίδια ερώτηση δύο φορές`);
+    for (const q of qs) {
+      assert.ok(q.q, `${city.id}: ελλιπής ερώτηση`);
       assert.equal(q.options.length, 3, `${city.id}: 3 απαντήσεις`);
       assert.equal(new Set(q.options).size, 3, `${city.id}: διπλές απαντήσεις`);
     }
@@ -118,12 +121,50 @@ test('κάθε πίστα τερματίζεται από τον αυτόματ�
   }
 });
 
-test('οι πίστες της Ελλάδας βγαίνουν και μόνο με γκάζι – φιλικές για αρχάριους', () => {
-  for (const city of COUNTRIES.greece.cities) {
+test('αν κρατάς συνέχεια γκάζι πέφτεις σε κάθε πίστα – πρέπει να το αφήνεις στα άλματα', () => {
+  for (const city of allCities()) {
     const sim = new LevelSim(trackForCity(city));
-    for (let t = 0; t < 200 && sim.state !== 'finished'; t += 1 / 60) sim.update(1 / 60, { gas: true, brake: false });
+    for (let t = 0; t < 120 && sim.state !== 'finished'; t += 1 / 60) sim.update(1 / 60, { gas: true, brake: false });
+    assert.ok(sim.crashes >= 2, `${city.id}: μόνο ${sim.crashes} πτώσεις με σκέτο γκάζι`);
+  }
+});
+
+// Οδηγός «άνθρωπος»: αφήνει το γκάζι όταν σηκώνεται η μύτη, αλλά αντιδρά με καθυστέρηση 0,25 s.
+const human = () => {
+  const hist = [];
+  return (b) => {
+    hist.push(b.angle);
+    const a = hist[Math.max(0, hist.length - 16)];
+    if (!b.grounded) return { gas: a > -0.2, brake: a < -0.7 };
+    return { gas: a > -0.45, brake: false };
+  };
+};
+
+test('ένας παίκτης που αφήνει το γκάζι (με καθυστέρηση) τερματίζει κάθε πίστα', () => {
+  for (const city of allCities()) {
+    const sim = new LevelSim(trackForCity(city));
+    const ctl = human();
+    for (let t = 0; t < 300 && sim.state !== 'finished'; t += 1 / 60) sim.update(1 / 60, ctl(sim.bike));
     assert.equal(sim.state, 'finished', city.id);
-    assert.ok(sim.crashes <= 1, `${city.id}: πτώσεις ${sim.crashes}`);
+    assert.ok(sim.crashes <= 3, `${city.id}: ${sim.crashes} πτώσεις`);
+  }
+});
+
+test('το mini quiz έχει μία ερώτηση για κάθε checkpoint, με το κείμενο που είδε ο παίκτης', () => {
+  for (const city of allCities()) {
+    const qs = finalQuiz(city);
+    assert.equal(qs.length, trackForCity(city).checkpoints.length, city.id);
+    qs.forEach((q, i) => {
+      assert.equal(q.checkpoint, i + 1);
+      assert.ok(q.source.length > 20, `${city.id}: λείπει η πηγή της ερώτησης`);
+    });
+  }
+});
+
+test('κάθε άλμα έχει πινακίδα προειδοποίησης πριν από τη ράμπα', () => {
+  for (const city of allCities()) {
+    const t = trackForCity(city);
+    for (const g of t.gaps) assert.ok(t.jumps.some((j) => j.water && j.x < g.x0 && g.x0 - j.x < 600), `${city.id}: κενό χωρίς πινακίδα`);
   }
 });
 

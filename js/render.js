@@ -1284,6 +1284,7 @@ export class Renderer {
     const yBottom = this.cam.y + (H - this.ay) / this.z + 40;
 
     this.drawStartSign(L);
+    this.drawJumpSigns(sim, L, x0, x1);
     this.drawGround(L.track, th, x0, x1, yBottom);
     for (const o of L.track.obstacles) {
       if (o.x > x0 - 60 && o.x < x1 + 60) drawObstacle(ctx, o, th, this.time);
@@ -1664,6 +1665,41 @@ export class Renderer {
     ctx.textBaseline = 'middle';
     ctx.fillText(name, x, y - 84);
     ctx.textBaseline = 'alphabetic';
+  }
+
+  /** Πινακίδες ⚠️ πριν από κάθε άλμα: εδώ πρέπει να αφήσεις το γκάζι στον αέρα. */
+  drawJumpSigns(sim, L, x0, x1) {
+    const { ctx } = this;
+    for (const j of L.track.jumps || []) {
+      if (j.x < x0 - 60 || j.x > x1 + 60) continue;
+      const gy = sim.world.groundY(j.x);
+      ctx.fillStyle = '#6b7280';
+      ctx.fillRect(j.x - 2, gy - 62, 4, 62);
+      ctx.fillStyle = '#facc15';
+      ctx.strokeStyle = '#1f2937';
+      ctx.lineWidth = 3;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(j.x, gy - 92);
+      ctx.lineTo(j.x + 19, gy - 60);
+      ctx.lineTo(j.x - 19, gy - 60);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#1f2937';
+      ctx.font = '900 20px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(j.water ? '≈' : '!', j.x, gy - 65);
+      if (L.showTips) {
+        ctx.font = 'bold 11px system-ui, sans-serif';
+        const text = 'Άσε το γκάζι στον αέρα!';
+        const w = ctx.measureText(text).width + 12;
+        ctx.fillStyle = 'rgba(255,255,255,0.95)';
+        ctx.fillRect(j.x - w / 2, gy - 54, w, 18);
+        ctx.fillStyle = '#b91c1c';
+        ctx.fillText(text, j.x, gy - 41);
+      }
+    }
   }
 
   drawCheckpoints(sim, L, x0, x1) {

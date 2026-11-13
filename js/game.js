@@ -3,7 +3,7 @@
 import { LevelSim, autopilot } from './physics.js';
 import { Renderer } from './render.js';
 import { trackForCity } from './levels.js';
-import { COUNTRIES } from './data/countries.js';
+import { COUNTRIES, cityDifficulty } from './data/countries.js';
 
 export class Game {
   constructor(canvas, sound) {
@@ -45,7 +45,8 @@ export class Game {
       country,
       city,
       look: { helmet, jacket: '#1f3b63', bikeColor: '#f25c05' },
-      checkpointLabels: [city.items[0].emoji, '❓', city.items[1].emoji, '❓'],
+      checkpointLabels: [city.items[0].emoji, '📖', city.items[1].emoji, '📖'],
+      showTips: cityDifficulty(city) < 0.2, // στην Ελλάδα οι πινακίδες λένε και τι να κάνεις
     });
     this.renderer.snapCamera(this.sim.bike);
   }

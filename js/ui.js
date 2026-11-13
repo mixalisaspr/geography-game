@@ -21,10 +21,22 @@ import {
 // Σειρά των checkpoints σε κάθε πίστα
 const CHECKPOINTS = [
   { type: 'item', i: 0 },
-  { type: 'quiz', i: 0 },
+  { type: 'info', i: 0 },
   { type: 'item', i: 1 },
-  { type: 'quiz', i: 1 },
+  { type: 'info', i: 1 },
 ];
+
+/** Οι ερωτήσεις του mini quiz: μία για κάθε checkpoint, με το κείμενο που είδε ο παίκτης. */
+export function finalQuiz(city) {
+  return CHECKPOINTS.map((cp, n) => {
+    if (cp.type === 'item') {
+      const it = city.items[cp.i];
+      return { ...it.quiz, checkpoint: n + 1, source: `${it.emoji} ${it.name}: ${it.desc} ${it.fact}` };
+    }
+    const info = city.infos[cp.i];
+    return { ...info.quiz, checkpoint: n + 1, source: `📖 ${info.text}` };
+  });
+}
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = (s) =>
@@ -395,8 +407,9 @@ export class UI {
       <div class="help">
         <div class="help-row"><span class="key">▶</span><p><b>Γκάζι</b> (δεξιά πλευρά της οθόνης ή →): η μηχανή προχωράει. Στον αέρα γέρνει <b>πίσω</b>.</p></div>
         <div class="help-row"><span class="key">◀</span><p><b>Φρένο</b> (αριστερή πλευρά ή ←): φρενάρει / κάνει όπισθεν. Στον αέρα γέρνει <b>μπροστά</b>.</p></div>
-        <div class="help-row"><span class="key">🚩</span><p>Στα <b>checkpoints</b> μαζεύεις αντικείμενα της χώρας και μαθαίνεις κάτι καινούργιο. Αν πέσεις, συνεχίζεις από το τελευταίο checkpoint.</p></div>
-        <div class="help-row"><span class="key">❓</span><p>Στη διαδρομή σε περιμένουν <b>ερωτήσεις</b>. Κάθε σωστή απάντηση σού δίνει <b>+1 πόντο</b> 🏆.</p></div>
+        <div class="help-row"><span class="key">⚠️</span><p>Αν κρατάς συνέχεια γκάζι, θα αναποδογυρίσεις! Στα <b>άλματα</b> (πινακίδα ⚠️) <b>άφησε το γκάζι</b> μόλις σηκωθείς στον αέρα.</p></div>
+        <div class="help-row"><span class="key">🚩</span><p>Στα <b>checkpoints</b> μαζεύεις αντικείμενα 🎒 και διαβάζεις πληροφορίες 📖 για τη χώρα. Αν πέσεις, συνεχίζεις από το τελευταίο checkpoint.</p></div>
+        <div class="help-row"><span class="key">🎓</span><p>Στον τερματισμό σε περιμένει ένα <b>mini quiz</b> με όσα έμαθες. Κάθε σωστή απάντηση σού δίνει <b>+1 πόντο</b> 🏆.</p></div>
         <div class="help-row"><span class="key">💥</span><p>Αν πέσεις με το κεφάλι, η μηχανή <b>εκρήγνυται</b> και χάνεις <b>1 πόντο</b>! Το ίδιο αν πέσεις στο νερό.</p></div>
         <div class="help-row"><span class="key">🗺️</span><p>Όταν τελειώσεις όλες τις πόλεις μιας χώρας, μπορείς να πας μόνο σε μια χώρα που <b>συνορεύει</b> μαζί της.</p></div>
       </div>
@@ -432,8 +445,8 @@ export class UI {
         <h2>${esc(city.name)}</h2>
         <p>${esc(city.intro)}</p>
         <p class="label">Θα βρεις στη διαδρομή:</p>
-        <div class="to-find">${CHECKPOINTS.map((c) => `<span>${c.type === 'item' ? city.items[c.i].emoji : '❓'}</span>`).join('')}</div>
-        <p class="muted points-rule">🏆 Σωστή απάντηση: <b>+1 πόντος</b> · 💥 Πτώση: <b>−1 πόντος</b></p>
+        <div class="to-find">${CHECKPOINTS.map((c) => `<span>${c.type === 'item' ? city.items[c.i].emoji : '📖'}</span>`).join('')}<span>🎓</span></div>
+        <p class="muted points-rule">Διάβασε προσεκτικά: στο τέλος σε περιμένει <b>mini quiz</b>! 🏆 Σωστή απάντηση: <b>+1</b> · 💥 Πτώση: <b>−1</b></p>
       </div>
       <div class="actions"><button class="btn" data-act="map">🗺️ Χάρτης</button><button class="btn primary big" data-act="go">Πάμε! 🏍️</button></div>`,
       (ev) => {
@@ -490,71 +503,36 @@ export class UI {
     $(`#hud-markers .marker[data-i="${index}"]`)?.classList.add('done');
     const cp = CHECKPOINTS[index];
     const label = `Checkpoint ${index + 1}/${CHECKPOINTS.length}`;
-    if (cp.type === 'quiz') return this.showQuiz(city.quizzes[cp.i], label);
-    const item = city.items[cp.i];
-    const isNew = collectItem(this.data, item.id);
-    this.run.items.push(item);
-    this.save();
-    this.updateBag();
-    this.sound.pickup();
-    this.openModal(
-      `<div class="item-card">
-        <div class="item-emoji pop">${item.emoji}</div>
-        <div class="item-text">
-          <p class="muted">${label} ${isNew ? '· <b class="new">ΝΕΟ!</b>' : ''}</p>
-          <h2>Μάζεψες: ${esc(item.name)}</h2>
-          <p>${esc(item.desc)}</p>
+    const remember = '<p class="remember">🎓 Θυμήσου το – θα σε ρωτήσω στο τέλος!</p>';
+    let html;
+    if (cp.type === 'item') {
+      const item = city.items[cp.i];
+      const isNew = collectItem(this.data, item.id);
+      this.run.items.push(item);
+      this.save();
+      this.updateBag();
+      this.sound.pickup();
+      html = `<div class="item-card">
+          <div class="item-emoji pop">${item.emoji}</div>
+          <div class="item-text">
+            <p class="muted">${label} ${isNew ? '· <b class="new">ΝΕΟ!</b>' : ''}</p>
+            <h2>Μάζεψες: ${esc(item.name)}</h2>
+            <p>${esc(item.desc)}</p>
+          </div>
         </div>
-      </div>
-      <div class="did-you-know"><b>📖 Ήξερες ότι…</b><p>${esc(item.fact)}</p></div>
-      <div class="actions"><button class="btn primary big" data-act="go">Συνέχεια ▶</button></div>`,
-      (ev) => {
-        if (ev.target.closest('[data-act="go"]')) {
-          this.sound.click();
-          this.closeModal();
-          this.game.resume();
-        }
-      },
-    );
-  }
-
-  showQuiz(q, label) {
-    const correct = q.options[0];
-    const opts = shuffle(q.options);
-    let answered = false;
+        <div class="did-you-know"><b>📖 Ήξερες ότι…</b><p>${esc(item.fact)}</p></div>`;
+    } else {
+      const info = city.infos[cp.i];
+      this.sound.checkpoint();
+      html = `<div class="info-card">
+          <p class="muted">${label} · Πληροφορία</p>
+          <div class="info-emoji pop">📖</div>
+          <div class="did-you-know big"><b>Ήξερες ότι…</b><p>${esc(info.text)}</p></div>
+        </div>`;
+    }
     this.openModal(
-      `<div class="quiz">
-        <p class="muted">${label} · Ερώτηση · 🏆 +1 πόντος αν απαντήσεις σωστά</p>
-        <h2>❓ ${esc(q.q)}</h2>
-        <div class="answers">${opts.map((o) => `<button class="btn answer" data-a="${esc(o)}">${esc(o)}</button>`).join('')}</div>
-        <div class="feedback" hidden></div>
-      </div>
-      <div class="actions"><button class="btn primary big" data-act="go" hidden>Συνέχεια ▶</button></div>`,
+      `${html}${remember}<div class="actions"><button class="btn primary big" data-act="go">Συνέχεια ▶</button></div>`,
       (ev) => {
-        const a = ev.target.closest('.answer');
-        if (a && !answered) {
-          answered = true;
-          const ok = a.dataset.a === correct;
-          this.run.answers.push(ok);
-          if (ok) {
-            this.run.correct++;
-            this.updatePoints(+1);
-            this.sound.correct();
-            setTimeout(() => this.sound.point(), 250);
-          } else this.sound.wrong();
-          for (const b of this.modalBox.querySelectorAll('.answer')) {
-            b.disabled = true;
-            if (b.dataset.a === correct) b.classList.add('right');
-            else if (b === a) b.classList.add('wrong');
-          }
-          const fb = $('.feedback', this.modalBox);
-          fb.hidden = false;
-          fb.className = `feedback ${ok ? 'ok' : 'bad'}`;
-          fb.innerHTML = `<b>${ok ? '✅ Σωστά! +1 πόντος 🏆' : `❌ Η σωστή απάντηση: ${esc(correct)}`}</b><p>${esc(q.explain)}</p>`;
-          $('[data-act="go"]', this.modalBox).hidden = false;
-          this.modalBox.scrollTo({ top: this.modalBox.scrollHeight, behavior: 'smooth' });
-          return;
-        }
         if (ev.target.closest('[data-act="go"]')) {
           this.sound.click();
           this.closeModal();
@@ -564,29 +542,106 @@ export class UI {
     );
   }
 
-  onFinish({ time }) {
+  /** Mini quiz στον τερματισμό, με ερωτήσεις από όσα είδε ο παίκτης στη διαδρομή. */
+  startFinalQuiz(stats) {
+    const questions = finalQuiz(this.run.city);
+    let n = 0;
+    const ask = () => {
+      const q = questions[n];
+      const correct = q.options[0];
+      const opts = shuffle(q.options);
+      const dots = questions
+        .map((_, k) => `<span class="dot ${k < n ? (this.run.answers[k] ? 'ok' : 'bad') : k === n ? 'cur' : ''}"></span>`)
+        .join('');
+      let answered = false;
+      this.openModal(
+        `<div class="quiz">
+          <div class="quiz-head"><span class="muted">🎓 Mini quiz · Ερώτηση ${n + 1}/${questions.length}</span><span class="dots">${dots}</span></div>
+          <h2>${esc(q.q)}</h2>
+          <div class="answers">${opts.map((o) => `<button class="btn answer" data-a="${esc(o)}">${esc(o)}</button>`).join('')}</div>
+          <div class="feedback" hidden></div>
+        </div>
+        <div class="actions"><button class="btn primary big" data-act="next" hidden>${n + 1 < questions.length ? 'Επόμενη ▶' : 'Αποτελέσματα 🏁'}</button></div>`,
+        (ev) => {
+          const a = ev.target.closest('.answer');
+          if (a && !answered) {
+            answered = true;
+            const ok = a.dataset.a === correct;
+            this.run.answers.push(ok);
+            if (ok) {
+              this.run.correct++;
+              this.updatePoints(+1);
+              this.sound.correct();
+              setTimeout(() => this.sound.point(), 250);
+            } else this.sound.wrong();
+            for (const b of this.modalBox.querySelectorAll('.answer')) {
+              b.disabled = true;
+              if (b.dataset.a === correct) b.classList.add('right');
+              else if (b === a) b.classList.add('wrong');
+            }
+            const fb = $('.feedback', this.modalBox);
+            fb.hidden = false;
+            fb.className = `feedback ${ok ? 'ok' : 'bad'}`;
+            fb.innerHTML = `<b>${ok ? '✅ Σωστά! +1 πόντος 🏆' : `❌ Η σωστή απάντηση: ${esc(correct)}`}</b>
+              <p class="source"><span class="muted">Το είδες στο checkpoint ${q.checkpoint}:</span><br>${esc(q.source)}</p>`;
+            $('[data-act="next"]', this.modalBox).hidden = false;
+            this.modalBox.scrollTo({ top: this.modalBox.scrollHeight, behavior: 'smooth' });
+            return;
+          }
+          if (ev.target.closest('[data-act="next"]')) {
+            this.sound.click();
+            n++;
+            if (n < questions.length) ask();
+            else this.showResults(stats);
+          }
+        },
+      );
+    };
+    this.openModal(
+      `<div class="results">
+        <div class="confetti">🎓</div>
+        <h2>Τερμάτισες! Ώρα για mini quiz!</h2>
+        <p>${questions.length} ερωτήσεις για όσα είδες στη διαδρομή. Κάθε σωστή απάντηση: <b>+1 πόντος</b> 🏆</p>
+      </div>
+      <div class="actions"><button class="btn primary big" data-act="start">Ξεκίνα ▶</button></div>`,
+      (ev) => {
+        if (ev.target.closest('[data-act="start"]')) {
+          this.sound.click();
+          ask();
+        }
+      },
+    );
+  }
+
+  onFinish(stats) {
+    this.game.pause();
+    this.run.answers = [];
+    this.run.correct = 0;
+    this.startFinalQuiz(stats);
+  }
+
+  showResults({ time }) {
     const run = this.run;
     const city = run.city;
     const country = COUNTRIES[city.countryId];
     const { correct, crashes } = run;
-    const nQuiz = city.quizzes.length;
-    const allRight = correct === nQuiz;
+    const nQuiz = run.answers.length;
+    const quizStar = correct >= nQuiz - 1;
     const points = this.points;
-    const stars = 1 + (allRight ? 1 : 0) + (crashes <= 1 ? 1 : 0);
+    const stars = 1 + (quizStar ? 1 : 0) + (crashes <= 1 ? 1 : 0);
     const prevBest = this.data.cities[city.id]?.points;
-    const { countryCompleted, newBest } = recordCityResult(this.data, city, { stars, quiz: allRight, time, points });
+    const { countryCompleted, newBest } = recordCityResult(this.data, city, { stars, quiz: correct === nQuiz, time, points });
     this.save();
-    this.game.pause();
     const nextInCountry = country.cities[city.index + 1];
-    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+    const plural = (k, one, many) => `${k} ${k === 1 ? one : many}`;
     this.openModal(
       `<div class="results">
         <p class="muted">${country.flag} ${esc(country.name)}</p>
-        <h2>🏁 Τερμάτισες! – ${esc(city.name)}</h2>
+        <h2>🏁 ${esc(city.name)} – Αποτελέσματα</h2>
         <div class="score-box ${points < 0 ? 'negative' : ''}">
           <div class="score">🏆 ${points} ${Math.abs(points) === 1 ? 'πόντος' : 'πόντοι'}</div>
           <div class="score-lines">
-            <span class="plus">✅ ${plural(correct, 'σωστή απάντηση', 'σωστές απαντήσεις')}: +${correct}</span>
+            <span class="plus">🎓 ${plural(correct, 'σωστή απάντηση', 'σωστές απαντήσεις')}: +${correct}</span>
             <span class="minus">💥 ${plural(crashes, 'πτώση', 'πτώσεις')}: −${crashes}</span>
           </div>
           ${newBest && prevBest !== undefined ? '<div class="record">🎉 Νέο ρεκόρ!</div>' : prevBest !== undefined ? `<div class="muted">Ρεκόρ: ${prevBest}</div>` : ''}
@@ -594,7 +649,7 @@ export class UI {
         <div class="big-stars">${starsHtml(stars)}</div>
         <ul class="star-reasons">
           <li class="on">★ Τερμάτισες τη διαδρομή</li>
-          <li class="${allRight ? 'on' : ''}">★ Όλες οι απαντήσεις σωστές (${correct}/${nQuiz})</li>
+          <li class="${quizStar ? 'on' : ''}">★ Τουλάχιστον ${nQuiz - 1}/${nQuiz} στο mini quiz (είχες ${correct})</li>
           <li class="${crashes <= 1 ? 'on' : ''}">★ Το πολύ 1 πτώση (είχες ${crashes})</li>
         </ul>
         <p>⏱️ Χρόνος: <b>${fmtTime(time)}</b> · Μάζεψες: ${city.items.map((i) => `<span title="${esc(i.name)}">${i.emoji}</span>`).join(' ')}</p>

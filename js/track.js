@@ -41,6 +41,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   const obs = [];
   const gaps = [];
   const checkpoints = [];
+  const jumps = [];
   let x = -600;
   let y = 0;
 
@@ -91,6 +92,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     kicker() {
       const useGap = water && rnd() < 0.55 + 0.35 * d;
       if (useGap) flat(260); // φόρα πριν από το άλμα
+      jumps.push({ x: x - 220, rampX: x, water: useGap }); // πινακίδα προειδοποίησης πριν από τη ράμπα
       const h = R(26, 38) + 10 * d;
       const rampLen = R(110, 140);
       curve(rampLen, (t) => -h * t * t);
@@ -184,6 +186,12 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   }
   flat(160);
   const finishX = x;
+  // οι πινακίδες να μη «πέφτουν» πάνω στις σημαίες των checkpoints
+  for (const j of jumps) {
+    for (const cp of checkpoints) {
+      if (Math.abs(j.x - cp) < 90) j.x = cp + 90 < j.rampX - 30 ? cp + 90 : cp - 90;
+    }
+  }
   flat(900);
 
   return {
@@ -191,6 +199,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     obstacles: obs,
     gaps,
     checkpoints,
+    jumps,
     startX,
     finishX,
     endX: x,
