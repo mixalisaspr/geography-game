@@ -12,9 +12,19 @@ import {
   isCountryDone,
   nextCity,
   recordCityResult,
+  runPoints,
+  totalPoints,
   totalStars,
   writeSave,
 } from './progress.js';
+
+// Σειρά των checkpoints σε κάθε πίστα
+const CHECKPOINTS = [
+  { type: 'item', i: 0 },
+  { type: 'quiz', i: 0 },
+  { type: 'item', i: 1 },
+  { type: 'quiz', i: 1 },
+];
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = (s) =>
@@ -100,6 +110,7 @@ export class UI {
         <div class="home-stats">
           <span>🌍 ${doneCountries}/${COUNTRY_IDS.length} χώρες</span>
           <span>🎒 ${got}/${items.length} αντικείμενα</span>
+          <span>🏆 ${totalPoints(this.data)} πόντοι</span>
           <span>⭐ ${totalStars(this.data)}</span>
         </div>
         <button class="btn big primary" data-act="play">▶ Παίξε</button>
@@ -256,7 +267,7 @@ export class UI {
             <span class="city-num">${city.index + 1}</span>
             <span class="city-name">${esc(city.name)}</span>
             <span class="city-items">${city.items.map((i) => (data.items[i.id] ? i.emoji : '❔')).join(' ')}</span>
-            <span class="city-stars">${unlocked ? (done ? starsHtml(stars) : '▶') : '🔒'}</span>
+            <span class="city-stars">${unlocked ? (done ? `${starsHtml(stars)}<small class="city-pts">🏆 ${data.cities[city.id].points ?? 0}</small>` : '▶') : '🔒'}</span>
           </button>`;
       })
       .join('');
@@ -385,9 +396,9 @@ export class UI {
         <div class="help-row"><span class="key">▶</span><p><b>Γκάζι</b> (δεξιά πλευρά της οθόνης ή →): η μηχανή προχωράει. Στον αέρα γέρνει <b>πίσω</b>.</p></div>
         <div class="help-row"><span class="key">◀</span><p><b>Φρένο</b> (αριστερή πλευρά ή ←): φρενάρει / κάνει όπισθεν. Στον αέρα γέρνει <b>μπροστά</b>.</p></div>
         <div class="help-row"><span class="key">🚩</span><p>Στα <b>checkpoints</b> μαζεύεις αντικείμενα της χώρας και μαθαίνεις κάτι καινούργιο. Αν πέσεις, συνεχίζεις από το τελευταίο checkpoint.</p></div>
-        <div class="help-row"><span class="key">❓</span><p>Στη μέση της πίστας σε περιμένει μια <b>ερώτηση</b>. Η σωστή απάντηση σού δίνει ένα αστέρι!</p></div>
+        <div class="help-row"><span class="key">❓</span><p>Στη διαδρομή σε περιμένουν <b>ερωτήσεις</b>. Κάθε σωστή απάντηση σού δίνει <b>+1 πόντο</b> 🏆.</p></div>
+        <div class="help-row"><span class="key">💥</span><p>Αν πέσεις με το κεφάλι, η μηχανή <b>εκρήγνυται</b> και χάνεις <b>1 πόντο</b>! Το ίδιο αν πέσεις στο νερό.</p></div>
         <div class="help-row"><span class="key">🗺️</span><p>Όταν τελειώσεις όλες τις πόλεις μιας χώρας, μπορείς να πας μόνο σε μια χώρα που <b>συνορεύει</b> μαζί της.</p></div>
-        <div class="help-row"><span class="key">⚠️</span><p>Μην πέσεις με το κεφάλι και πρόσεχε τη θάλασσα και τα ποτάμια!</p></div>
       </div>
       <div class="actions"><button class="btn primary" data-act="ok">Κατάλαβα!</button></div>`,
       (ev) => {
@@ -408,11 +419,12 @@ export class UI {
     this.save();
     this.showScreen(null);
     this.hud.hidden = false;
-    this.run = { city, quiz: null, items: [] };
+    this.run = { city, answers: [], correct: 0, crashes: 0, items: [] };
     this.game.load(city, 'play');
     this.game.pause();
     $('#hud-city').textContent = `${country.flag} ${city.name}`;
     this.updateBag();
+    this.updatePoints();
     this.renderProgressMarkers();
     this.openModal(
       `<div class="level-intro">
@@ -420,7 +432,8 @@ export class UI {
         <h2>${esc(city.name)}</h2>
         <p>${esc(city.intro)}</p>
         <p class="label">Θα βρεις στη διαδρομή:</p>
-        <div class="to-find">${city.items.map((i) => `<span>${i.emoji}</span>`).join('')}<span>❓</span></div>
+        <div class="to-find">${CHECKPOINTS.map((c) => `<span>${c.type === 'item' ? city.items[c.i].emoji : '❓'}</span>`).join('')}</div>
+        <p class="muted points-rule">🏆 Σωστή απάντηση: <b>+1 πόντος</b> · 💥 Πτώση: <b>−1 πόντος</b></p>
       </div>
       <div class="actions"><button class="btn" data-act="map">🗺️ Χάρτης</button><button class="btn primary big" data-act="go">Πάμε! 🏍️</button></div>`,
       (ev) => {
@@ -435,11 +448,32 @@ export class UI {
     );
   }
 
+  get points() {
+    return this.run ? runPoints(this.run.correct, this.run.crashes) : 0;
+  }
+
   updateBag() {
     const city = this.run?.city;
     if (!city) return;
     const n = city.items.filter((i) => this.data.items[i.id]).length;
     $('#hud-bag').textContent = `🎒 ${n}/${city.items.length}`;
+  }
+
+  updatePoints(change = 0) {
+    const el = $('#hud-points');
+    el.textContent = `🏆 ${this.points}`;
+    el.classList.toggle('negative', this.points < 0);
+    if (change) {
+      el.classList.remove('up', 'down');
+      void el.offsetWidth; // επανεκκίνηση του animation
+      el.classList.add(change > 0 ? 'up' : 'down');
+    }
+  }
+
+  onCrash() {
+    if (!this.run) return;
+    this.run.crashes++;
+    this.updatePoints(-1);
   }
 
   renderProgressMarkers() {
@@ -454,9 +488,10 @@ export class UI {
   onCheckpoint(index) {
     const city = this.run.city;
     $(`#hud-markers .marker[data-i="${index}"]`)?.classList.add('done');
-    if (index === 1) return this.showQuiz(city);
-    const item = city.items[index === 0 ? 0 : 1];
-    const fact = city.facts[index === 0 ? 0 : 1];
+    const cp = CHECKPOINTS[index];
+    const label = `Checkpoint ${index + 1}/${CHECKPOINTS.length}`;
+    if (cp.type === 'quiz') return this.showQuiz(city.quizzes[cp.i], label);
+    const item = city.items[cp.i];
     const isNew = collectItem(this.data, item.id);
     this.run.items.push(item);
     this.save();
@@ -466,12 +501,12 @@ export class UI {
       `<div class="item-card">
         <div class="item-emoji pop">${item.emoji}</div>
         <div class="item-text">
-          <p class="muted">Checkpoint ${index + 1}/3 ${isNew ? '· <b class="new">ΝΕΟ!</b>' : ''}</p>
+          <p class="muted">${label} ${isNew ? '· <b class="new">ΝΕΟ!</b>' : ''}</p>
           <h2>Μάζεψες: ${esc(item.name)}</h2>
           <p>${esc(item.desc)}</p>
         </div>
       </div>
-      <div class="did-you-know"><b>📖 Ήξερες ότι…</b><p>${esc(fact)}</p></div>
+      <div class="did-you-know"><b>📖 Ήξερες ότι…</b><p>${esc(item.fact)}</p></div>
       <div class="actions"><button class="btn primary big" data-act="go">Συνέχεια ▶</button></div>`,
       (ev) => {
         if (ev.target.closest('[data-act="go"]')) {
@@ -483,13 +518,13 @@ export class UI {
     );
   }
 
-  showQuiz(city) {
-    const q = city.quiz;
+  showQuiz(q, label) {
     const correct = q.options[0];
     const opts = shuffle(q.options);
+    let answered = false;
     this.openModal(
       `<div class="quiz">
-        <p class="muted">Checkpoint 2/3 · Ερώτηση</p>
+        <p class="muted">${label} · Ερώτηση · 🏆 +1 πόντος αν απαντήσεις σωστά</p>
         <h2>❓ ${esc(q.q)}</h2>
         <div class="answers">${opts.map((o) => `<button class="btn answer" data-a="${esc(o)}">${esc(o)}</button>`).join('')}</div>
         <div class="feedback" hidden></div>
@@ -497,10 +532,16 @@ export class UI {
       <div class="actions"><button class="btn primary big" data-act="go" hidden>Συνέχεια ▶</button></div>`,
       (ev) => {
         const a = ev.target.closest('.answer');
-        if (a && this.run.quiz === null) {
+        if (a && !answered) {
+          answered = true;
           const ok = a.dataset.a === correct;
-          this.run.quiz = ok;
-          ok ? this.sound.correct() : this.sound.wrong();
+          this.run.answers.push(ok);
+          if (ok) {
+            this.run.correct++;
+            this.updatePoints(+1);
+            this.sound.correct();
+            setTimeout(() => this.sound.point(), 250);
+          } else this.sound.wrong();
           for (const b of this.modalBox.querySelectorAll('.answer')) {
             b.disabled = true;
             if (b.dataset.a === correct) b.classList.add('right');
@@ -509,7 +550,7 @@ export class UI {
           const fb = $('.feedback', this.modalBox);
           fb.hidden = false;
           fb.className = `feedback ${ok ? 'ok' : 'bad'}`;
-          fb.innerHTML = `<b>${ok ? '✅ Σωστά! +1 ⭐' : `❌ Η σωστή απάντηση: ${esc(correct)}`}</b><p>${esc(q.explain)}</p>`;
+          fb.innerHTML = `<b>${ok ? '✅ Σωστά! +1 πόντος 🏆' : `❌ Η σωστή απάντηση: ${esc(correct)}`}</b><p>${esc(q.explain)}</p>`;
           $('[data-act="go"]', this.modalBox).hidden = false;
           this.modalBox.scrollTo({ top: this.modalBox.scrollHeight, behavior: 'smooth' });
           return;
@@ -523,28 +564,40 @@ export class UI {
     );
   }
 
-  onFinish({ time, crashes }) {
-    const city = this.run.city;
+  onFinish({ time }) {
+    const run = this.run;
+    const city = run.city;
     const country = COUNTRIES[city.countryId];
-    const quizOk = !!this.run.quiz;
-    const stars = 1 + (quizOk ? 1 : 0) + (crashes <= 1 ? 1 : 0);
-    const { countryCompleted } = recordCityResult(this.data, city, { stars, quiz: quizOk, time });
+    const { correct, crashes } = run;
+    const nQuiz = city.quizzes.length;
+    const allRight = correct === nQuiz;
+    const points = this.points;
+    const stars = 1 + (allRight ? 1 : 0) + (crashes <= 1 ? 1 : 0);
+    const prevBest = this.data.cities[city.id]?.points;
+    const { countryCompleted, newBest } = recordCityResult(this.data, city, { stars, quiz: allRight, time, points });
     this.save();
     this.game.pause();
     const nextInCountry = country.cities[city.index + 1];
+    const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     this.openModal(
       `<div class="results">
         <p class="muted">${country.flag} ${esc(country.name)}</p>
         <h2>🏁 Τερμάτισες! – ${esc(city.name)}</h2>
+        <div class="score-box ${points < 0 ? 'negative' : ''}">
+          <div class="score">🏆 ${points} ${Math.abs(points) === 1 ? 'πόντος' : 'πόντοι'}</div>
+          <div class="score-lines">
+            <span class="plus">✅ ${plural(correct, 'σωστή απάντηση', 'σωστές απαντήσεις')}: +${correct}</span>
+            <span class="minus">💥 ${plural(crashes, 'πτώση', 'πτώσεις')}: −${crashes}</span>
+          </div>
+          ${newBest && prevBest !== undefined ? '<div class="record">🎉 Νέο ρεκόρ!</div>' : prevBest !== undefined ? `<div class="muted">Ρεκόρ: ${prevBest}</div>` : ''}
+        </div>
         <div class="big-stars">${starsHtml(stars)}</div>
         <ul class="star-reasons">
           <li class="on">★ Τερμάτισες τη διαδρομή</li>
-          <li class="${quizOk ? 'on' : ''}">★ Σωστή απάντηση στην ερώτηση</li>
+          <li class="${allRight ? 'on' : ''}">★ Όλες οι απαντήσεις σωστές (${correct}/${nQuiz})</li>
           <li class="${crashes <= 1 ? 'on' : ''}">★ Το πολύ 1 πτώση (είχες ${crashes})</li>
         </ul>
-        <p>⏱️ Χρόνος: <b>${fmtTime(time)}</b></p>
-        <p class="label">Μάζεψες:</p>
-        <div class="to-find">${city.items.map((i) => `<span title="${esc(i.name)}">${i.emoji}</span>`).join('')}</div>
+        <p>⏱️ Χρόνος: <b>${fmtTime(time)}</b> · Μάζεψες: ${city.items.map((i) => `<span title="${esc(i.name)}">${i.emoji}</span>`).join(' ')}</p>
       </div>
       <div class="actions">
         <button class="btn" data-act="again">↻ Ξανά</button>
@@ -738,6 +791,7 @@ export class UI {
       this.resetInput();
       this.onCheckpoint(i);
     });
+    g.on('crash', () => this.onCrash());
     g.on('finish', (stats) => {
       this.resetInput();
       this.onFinish(stats);

@@ -13,7 +13,7 @@ export const CFG = {
   reverseSpin: -7,
   leanAir: 7,
   leanGround: 5,
-  wheelieAssist: 12,
+  wheelieAssist: 20,
   maxAngVel: 4,
   airLeanDelay: 0.25,
   grip: 0.85,
@@ -240,10 +240,10 @@ export class Bike {
       // γωνία ως προς την κλίση του εδάφους (αρνητική = μύτη πάνω)
       const n = this.contact[0] || this.contact[1];
       const rel = wrapAngle(this.angle - Math.atan2(n.x, -n.y));
-      if (gas) alpha -= CFG.leanGround * Math.max(0, Math.min(1, 1 + rel / 0.45));
+      if (gas) alpha -= CFG.leanGround * Math.max(0, Math.min(1, 1 + rel / 0.35));
       if (brake) alpha += CFG.leanGround;
       // υποβοήθηση: αν η σούζα πάει να γίνει ανατροπή, κατεβάζουμε απαλά τη μύτη
-      if (alive && rel < -0.55) alpha += CFG.wheelieAssist * Math.min(1, (-rel - 0.55) / 0.35);
+      if (alive && rel < -0.4) alpha += CFG.wheelieAssist * Math.min(1, (-rel - 0.4) / 0.3);
     } else if (inAir) {
       alpha = lean * CFG.leanAir;
     }
@@ -472,7 +472,7 @@ export class LevelSim {
       if (reason) {
         this.state = 'crashed';
         this.crashReason = reason;
-        this.crashTimer = 1.3;
+        this.crashTimer = reason === 'water' ? 1.4 : 1.8;
         this.crashes++;
         events.push({ type: 'crash', reason });
         return;

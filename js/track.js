@@ -30,7 +30,7 @@ const STEP = 14;
  * @param {string[]} o.obstacles τύποι εμποδίων
  * @param {number} o.hills πολλαπλασιαστής λόφων
  */
-export function generateTrack({ seed, difficulty = 0, water = null, obstacles = ['rock'], hills = 1 }) {
+export function generateTrack({ seed, difficulty = 0, water = null, obstacles = ['rock'], hills = 1, checkpointCount = 4 }) {
   const rnd = mulberry32(hashStr(seed));
   const R = (a, b) => a + (b - a) * rnd();
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
@@ -158,11 +158,13 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   flat(800); // x = 200
   const startX = 0;
 
-  const length = 2800 + 2400 * d;
-  const chunk = length / 4;
-  for (let k = 0; k < 4; k++) {
+  // μεγάλες πίστες: ~6.500–11.500 μονάδες (περίπου 30–50 δευτερόλεπτα οδήγησης)
+  const length = 6500 + 5000 * d;
+  const parts = checkpointCount + 1;
+  const chunk = length / parts;
+  for (let k = 0; k < parts; k++) {
     const end = x + chunk;
-    let guaranteedJump = k === 1 && water; // σε παραθαλάσσιες πόλεις υπάρχει σίγουρα ένα άλμα πάνω από νερό
+    let guaranteedJump = (k === 1 || k === 3) && water; // σε παραθαλάσσιες πόλεις υπάρχει σίγουρα ένα άλμα πάνω από νερό
     while (x < end) {
       let f = pickFeature();
       if (guaranteedJump) {
@@ -173,7 +175,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
       features[f]();
       flat(R(50, 110));
     }
-    if (k < 3) {
+    if (k < parts - 1) {
       // ίσιωμα με checkpoint στη μέση
       const cx = x + 140;
       flat(280);

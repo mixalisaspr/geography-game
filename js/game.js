@@ -1,7 +1,7 @@
 // Βρόχος παιχνιδιού: τρέχει τη φυσική (LevelSim), ζωγραφίζει (Renderer) και στέλνει events στο UI.
 
 import { LevelSim, autopilot } from './physics.js';
-import { Renderer, shade } from './render.js';
+import { Renderer } from './render.js';
 import { trackForCity } from './levels.js';
 import { COUNTRIES } from './data/countries.js';
 
@@ -44,8 +44,8 @@ export class Game {
       theme: city.theme,
       country,
       city,
-      look: { helmet, jacket: shade(country.colors[1] === '#ffffff' ? '#1f2937' : country.colors[1], -0.1), bikeColor: '#f25c05' },
-      checkpointLabels: [city.items[0].emoji, '❓', city.items[1].emoji],
+      look: { helmet, jacket: '#1f3b63', bikeColor: '#f25c05' },
+      checkpointLabels: [city.items[0].emoji, '❓', city.items[1].emoji, '❓'],
     });
     this.renderer.snapCamera(this.sim.bike);
   }
@@ -102,14 +102,17 @@ export class Game {
       r.shake = 0.6;
       if (e.reason === 'water') {
         r.burst(c.x, sim.world.gapAt(c.x)?.waterY ?? c.y, '#cfe9ff', 30, 260, 500);
-        r.floatText(c.x, c.y - 40, 'Πλατς! 💦', '#bfe3ff');
+        r.floatText(c.x, c.y - 60, 'Πλατς! 💦', '#bfe3ff', 30);
         if (this.mode === 'play') this.sound.splash();
       } else {
-        r.burst(sim.bike.p[2].x, sim.bike.p[2].y, '#ffd166', 10, 120, 0, ['⭐', '💫']);
-        r.floatText(c.x, c.y - 50, 'Ωχ!', '#ffd166');
-        if (this.mode === 'play') this.sound.crash();
+        r.explode(c.x, c.y - 14, sim.bike);
+        r.floatText(c.x, c.y - 70, 'ΜΠΟΥΜ! 💥', '#ffd166', 34);
+        if (this.mode === 'play') this.sound.explosion();
       }
-      if (this.mode === 'play') this.emit('crash', e.reason);
+      if (this.mode === 'play') {
+        r.floatText(c.x + 50, c.y - 30, '−1', '#ff6b6b', 30);
+        this.emit('crash', e.reason);
+      }
     } else if (e.type === 'respawn') {
       r.floatText(c.x, c.y - 60, 'Ξανά!', '#ffffff');
     } else if (e.type === 'checkpoint') {
