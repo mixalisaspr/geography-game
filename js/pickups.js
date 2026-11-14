@@ -63,6 +63,15 @@ export function generatePickups(track, seed = 'pickups') {
     const y0 = groundY(pts, g.x0 - 2);
     const y1 = groundY(pts, g.x1 + 2);
     const w = g.x1 - g.x0;
+    if (g.launch) {
+      // μεγάλο άλμα: διαμάντια πάνω στην τροχιά της πτήσης
+      const L = g.launch;
+      for (const k of [0.16, 0.34, 0.52, 0.7]) {
+        const t = L.T * k;
+        out.push({ kind: 'gem', x: L.x + L.vx * t, y: L.y - 34 + L.vy * t + 380 * t * t });
+      }
+      continue;
+    }
     const n = w > 260 ? 3 : w > 120 ? 2 : 1;
     for (let i = 1; i <= n; i++) {
       const t = i / (n + 1);

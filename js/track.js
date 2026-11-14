@@ -50,7 +50,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   const jumps = [];
   const savepoints = [];
   const spans = []; // ποιο κομμάτι πίστας είναι πού (για αποσφαλμάτωση/τεστ)
-  const SAVE_EVERY = rider ? 4200 : 1200; // σημεία επαναφοράς (χωρίς popup) ανάμεσα στα checkpoints
+  const SAVE_EVERY = rider ? 3600 : 1200; // σημεία επαναφοράς (χωρίς popup) ανάμεσα στα checkpoints
   let lastSave = 0;
   let x = -600;
   let y = 0;
@@ -175,7 +175,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   const ramp = (len, h) => curve(len, (t) => -h * t * t);
   // γκρεμός (ή νερό, στις πόλεις με θάλασσα/λίμνη/ποτάμι): κενό πλάτους w,
   // προσγείωση στο ύψος landY (με κατηφόρα προς baseY)
-  const pit = (w, landY, baseY) => {
+  const pit = (w, landY, baseY, steep = 0) => {
     const lipX = x;
     const lipY = y;
     const deathY = Math.max(lipY, landY) + (water ? 28 : 70);
@@ -186,12 +186,29 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     gaps.push({ x0: lipX, x1: lipX + w, waterY: deathY, bottom, pit: !water, topY: Math.min(lipY, landY) });
     // κατηφόρα προσγείωσης: ξεκινάει με κλίση, τελειώνει οριζόντια
     const dh = baseY - landY;
+    if (steep) {
+      // απότομη, ίσια κατηφόρα προσγείωσης (για πολύ ψηλά άλματα) που σβήνει ομαλά στο τέλος
+      const d1 = dh * 0.8;
+      curve(d1 / steep, (t) => d1 * t);
+      const d2 = dh - d1;
+      curve((2 * d2) / steep, (t) => d2 * (1 - (1 - t) * (1 - t)));
+      return;
+    }
     curve(Math.max(420, Math.abs(dh) * 3.6), (t) => dh * (1 - (1 - t) * (1 - t)));
   };
   // ένταση: η πίστα ξεκινά πιο ήπια και φτάνει στο πλήρες μέγεθος στο ~40% της διαδρομής
   const TOTAL = 80000 + 40000 * d;
   const I = () => 0.65 + 0.35 * Math.min(1, Math.max(0, x / (TOTAL * 0.4)));
-  const sign = (gapAhead) => jumps.push({ x: x - 200, rampX: x, pit: gapAhead && !water, water: gapAhead && !!water });
+  const sign = (gapAhead, flips = 0, back = 200) => jumps.push({ x: x - back, rampX: x, pit: gapAhead && !water, water: gapAhead && !!water, flips });
+  // πτήση από ράμπα ύψους h και μήκους len, με προσγείωση drop πιο χαμηλά: { vx, vy, T (χρόνος), range }
+  const flight = (h, len, drop, v0 = RIDER_TOP) => {
+    const th = Math.atan((2 * h) / len);
+    const v = Math.sqrt(Math.max(220 * 220, v0 * v0 - 2 * 760 * h * 0.7));
+    const vy = v * Math.sin(th);
+    const vx = v * Math.cos(th);
+    const T = (vy + Math.sqrt(Math.max(0, vy * vy + 2 * 760 * drop))) / 760;
+    return { vx, vy, T, range: vx * T };
+  };
   // υλικό των μεγάλων όγκων: μάρμαρο όπου υπάρχουν αρχαίοι κίονες, αλλιώς πέτρα
   const blockMat = obstacles.includes('column') ? 'marble' : 'stone';
   Object.assign(features, {
@@ -264,6 +281,93 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
       obs.push(makeBlock(x + bw / 2, y, bw, bh, blockMat));
       flat(bw + bh * 1.5 + R(300, 400));
     },
+    megaRamp() {
+      // «εκτοξευτήρας»: ψηλός λόφος, φόρα, μεγάλη ράμπα και τεράστιο άλμα πάνω από φαράγγι
+      // με προσγείωση πολύ πιο χαμηλά – αρκετός χρόνος στον αέρα για 2 ή 3 τούμπες
+      maybeSave();
+      const base0 = y;
+      const D = R(600, 900) * I();
+      curve(Math.max(R(900, 1200), (D * Math.PI) / 2 / 0.5), (t) => -D * (1 - Math.cos(Math.PI * t)) * 0.5);
+      // σημαιάκι στην κορυφή: αν πέσεις στο μεγάλο άλμα, το ξαναδοκιμάζεις αμέσως
+      flat(80);
+      savepoints.push(x);
+      lastSave = x;
+      flat(R(520, 680));
+      const h = R(140, 170);
+      const len = R(290, 330);
+      const drop = D * R(0.82, 0.95) + h;
+      // στο χείλος η μηχανή έχει σχεδόν όλη της την ταχύτητα· προσγειώνεσαι σε μακριά κατηφόρα
+      const th = Math.atan((2 * h) / len);
+      const vx = RIDER_TOP * Math.cos(th);
+      const vy = RIDER_TOP * Math.sin(th);
+      const T = (vy + Math.sqrt(vy * vy + 2 * 760 * drop * 0.75)) / 760;
+      sign(true, T > 1.75 ? 3 : 2);
+      ramp(len, h);
+      const w = Math.max(260, Math.min(480, vx * R(0.7, 0.92)));
+      const lipX = x;
+      const lipY = y;
+      pit(w, lipY + drop * 0.25, Math.max(base0, lipY + drop), 0.9);
+      gaps[gaps.length - 1].launch = { x: lipX, y: lipY, vx, vy: -vy, T };
+      flat(R(420, 540));
+    },
+    islands() {
+      // «νησάκια»: 2–3 άλματα στη σειρά, από πλατφόρμα σε πλατφόρμα, κάθε μία λίγο πιο χαμηλά
+      const n = 2 + Math.floor(rnd() * 2);
+      const total = n * 45;
+      curve(Math.max(520, total * 4), (t) => -total * (1 - Math.cos(Math.PI * t)) * 0.5);
+      maybeSave();
+      flat(R(380, 460));
+      for (let i = 0; i < n; i++) {
+        sign(true);
+        const h = R(26, 36);
+        const len = R(115, 135);
+        const drop = R(30, 55);
+        const f = flight(h, len, drop + h);
+        ramp(len, h);
+        const w = Math.max(120, Math.min(260, f.range * R(0.4, 0.5)));
+        const landY = y + h + drop;
+        pit(w, landY, landY + 12);
+        flat(Math.max(120, f.range * 0.55 - 300) + R(80, 140));
+        maybeSave();
+      }
+      flat(R(260, 360));
+    },
+    stepUp() {
+      // άλμα προς τα πάνω: ράμπα, γκρεμός και προσγείωση σε ψηλότερο πλάτωμα
+      flat(R(420, 520));
+      sign(true);
+      const base0 = y;
+      const h = R(70, 92) * (0.85 + 0.15 * I());
+      const len = R(190, 220);
+      const up = R(10, 34) * I(); // πόσο πιο ψηλά από το χείλος της ράμπας προσγειώνεσαι
+      const f = flight(h, len, -up);
+      ramp(len, h);
+      const w = Math.max(110, Math.min(230, f.range * R(0.42, 0.55)));
+      const landY = y - up;
+      pit(w, landY, landY);
+      flat(R(200, 300));
+      // κατηφόρα πίσω στο αρχικό ύψος
+      const back = base0 - y;
+      curve(Math.max(420, Math.abs(back) * 3.4), (t) => back * (1 - Math.cos(Math.PI * t)) * 0.5);
+      flat(R(240, 340));
+    },
+    valleyLaunch() {
+      // βαθιά κοιλάδα που σε εκτοξεύει από την απέναντι πλευρά πάνω από γκρεμό
+      flat(R(260, 340));
+      const base0 = y;
+      const D = R(130, 210) * I();
+      curve(Math.max(520, D * 3.6), (t) => D * (1 - Math.cos(Math.PI * t)) * 0.5);
+      sign(true, 0, 40);
+      const h = D * R(0.75, 0.95);
+      const len = Math.max(260, h * 2.3);
+      const drop = R(60, 140) * I();
+      const f = flight(h, len, drop, RIDER_TOP * 1.05);
+      ramp(len, h);
+      const w = Math.max(150, Math.min(420, f.range * R(0.48, 0.6)));
+      const landY = y + drop;
+      pit(w, landY, Math.max(base0, landY + 30));
+      flat(R(300, 400));
+    },
     stairs() {
       // σκαλοπάτια προς τα κάτω (ή πάνω, με απαλές ράμπες)
       const n = 3 + Math.floor(rnd() * 3);
@@ -291,6 +395,10 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
         ['megaDrop', 2 + 0.5 * d],
         ['tabletop', 2],
         ['block', 2.4],
+        ['megaRamp', 2.2 + 0.6 * d],
+        ['islands', 1.8 + 0.5 * d],
+        ['stepUp', 1.6 + 0.4 * d],
+        ['valleyLaunch', 1.8],
         ['stairs', 1.2],
         ['obstacle', 2.4],
         ['hillObstacles', 0.8],
@@ -306,13 +414,16 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
       ];
   const totalW = weights.reduce((s, w) => s + w[1], 0);
   let last = '';
+  let last2 = '';
+  const used = new Set();
+  // ποτέ το ίδιο κομμάτι δύο φορές στη σειρά, και σπάνια το ίδιο με το προ-προηγούμενο
   const pickFeature = () => {
-    for (let tries = 0; tries < 5; tries++) {
+    for (let tries = 0; tries < 6; tries++) {
       let r = rnd() * totalW;
       for (const [name, w] of weights) {
         r -= w;
         if (r <= 0) {
-          if (name !== last || tries === 4) return name;
+          if ((name !== last && name !== last2) || tries === 5) return name;
           break;
         }
       }
@@ -336,11 +447,16 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     let guaranteedJump = !!water && !rider; // σε κάθε κομμάτι πόλης με νερό υπάρχει σίγουρα ένα άλμα πάνω από νερό
     while (x < end) {
       let f = pickFeature();
-      if (rider && y > 200) f = 'climb'; // μην κατεβαίνουμε συνέχεια πιο χαμηλά
+      // κάθε πίστα έχει σίγουρα μεγάλο άλμα, όγκο και νησάκια
+      const must = rider && x - (end - chunk) < 5000 ? [null, 'megaRamp', 'block', 'islands', null][k] : null;
+      if (must && !used.has(must)) f = must;
+      if (rider && y > 200) f = 'climb';
+      used.add(f); // μην κατεβαίνουμε συνέχεια πιο χαμηλά
       if (guaranteedJump && x > end - chunk / 2) {
         f = 'kicker';
         guaranteedJump = false;
       }
+      last2 = last;
       last = f;
       const fx0 = x;
       features[f]();

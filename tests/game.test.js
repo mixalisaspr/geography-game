@@ -22,6 +22,7 @@ import {
   runPoints,
   totalPoints,
   trickPoints,
+  flipBase,
 } from '../js/progress.js';
 
 const OBSTACLES = ['column', 'amphora', 'rock', 'crate', 'barrel', 'hay', 'log'];
@@ -115,7 +116,7 @@ test('η πίστα είναι ντετερμινιστική, αρκετά με
     for (let i = 1; i < stops.length; i++)
       assert.ok(stops[i] - stops[i - 1] >= 15000, `${city.id}: μόνο ${Math.round(stops[i] - stops[i - 1])} από checkpoint σε checkpoint`);
     assert.ok(a.finishX - a.startX >= 80000, `${city.id}: πολύ μικρή πίστα (${Math.round(a.finishX)})`);
-    if (city.rider) assert.ok(a.obstacles.length >= 15 && a.gaps.length >= 6, `${city.id}: λίγα εμπόδια/γκρεμοί`);
+    if (city.rider) assert.ok(a.obstacles.length >= 5 && a.gaps.length >= 10, `${city.id}: λίγα εμπόδια/γκρεμοί`);
     else assert.ok(a.obstacles.length >= 200, `${city.id}: λίγα εμπόδια (${a.obstacles.length})`);
     let prev = a.startX;
     for (const cp of a.checkpoints) {
@@ -415,4 +416,24 @@ test('τέλεια προσγείωση: ίσια προσγείωση μετά 
   assert.ok(types.includes('land'));
   assert.ok(types.includes('perfect'));
   assert.equal(sim.perfects, 1);
+});
+
+test('ποικιλία: κάθε πίστα έχει μεγάλο άλμα για 2+ τούμπες και τουλάχιστον 9 είδη κομματιών, ποτέ το ίδιο δύο φορές στη σειρά', () => {
+  for (const city of allCities()) {
+    const t = trackForCity(city);
+    const kinds = new Set(t.spans.map((s) => s.f));
+    assert.ok(kinds.size >= 9, `${city.id}: μόνο ${kinds.size} είδη`);
+    const mega = t.gaps.filter((g) => g.launch);
+    assert.ok(mega.length >= 1, `${city.id}: κανένα μεγάλο άλμα`);
+    // αρκετός χρόνος στον αέρα για δύο πλήρεις τούμπες
+    for (const g of mega) assert.ok(g.launch.T >= 1.4, `${city.id}: μικρό άλμα (${g.launch.T.toFixed(2)} s)`);
+    assert.ok(t.jumps.some((j) => j.flips >= 2), `${city.id}: λείπει η πινακίδα 🔄×2`);
+    for (let i = 1; i < t.spans.length; i++) {
+      // το 'climb' μπαίνει και αναγκαστικά, όταν η πίστα έχει κατέβει πολύ
+      if (t.spans[i].f !== 'climb') assert.notEqual(t.spans[i].f, t.spans[i - 1].f, `${city.id}: ${t.spans[i].f} δύο φορές στη σειρά`);
+    }
+  }
+  assert.equal(flipBase(1), RIDER_SCORE.flip);
+  assert.equal(flipBase(2), RIDER_SCORE.flip * 3);
+  assert.equal(flipBase(3), RIDER_SCORE.flip * 6);
 });

@@ -1987,6 +1987,18 @@ export class Renderer {
       ctx.font = '900 20px system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(j.water ? '≈' : j.pit ? '⇡' : '!', j.x, gy - 65);
+      if (j.flips >= 2) {
+        // μεγάλο άλμα: εδώ χωράνε 2 ή 3 τούμπες
+        const text = `🔄×${j.flips}`;
+        ctx.font = '900 15px system-ui, sans-serif';
+        const w = ctx.measureText(text).width + 14;
+        ctx.fillStyle = '#7c3aed';
+        ctx.beginPath();
+        ctx.roundRect?.(j.x - w / 2, gy - 122, w, 24, 8);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.fillText(text, j.x, gy - 105);
+      }
       if (L.showTips) {
         ctx.font = 'bold 11px system-ui, sans-serif';
         const text = !L.rider

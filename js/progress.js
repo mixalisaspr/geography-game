@@ -112,6 +112,9 @@ export const RIDER_SCORE = {
   perfect: 5, // τέλεια προσγείωση μετά από μεγάλο άλμα
 };
 
+/** Βασικοί πόντοι για n τούμπες σε ένα άλμα: 10, 30 (διπλή), 60 (τριπλή)… */
+export const flipBase = (n) => (RIDER_SCORE.flip * n * (n + 1)) / 2;
+
 /** Πόντοι για κόλπο (τούμπα ή τέλεια προσγείωση) με τον πολλαπλασιαστή του σερί. */
 export const trickPoints = (base, mult = 1, count = 1) => base * count * Math.max(1, mult);
 

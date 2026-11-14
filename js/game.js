@@ -4,7 +4,7 @@ import { LevelSim, autopilot } from './physics.js';
 import { Renderer } from './render.js';
 import { trackForCity } from './levels.js';
 import { COUNTRIES, cityDifficulty } from './data/countries.js';
-import { RIDER_SCORE, trickPoints } from './progress.js';
+import { RIDER_SCORE, flipBase, trickPoints } from './progress.js';
 
 export class Game {
   constructor(canvas, sound) {
@@ -121,9 +121,11 @@ export class Game {
       }
     } else if (e.type === 'flip') {
       if (this.mode === 'play') {
-        const name = e.dir === 'front' ? 'Τούμπα μπροστά' : 'Τούμπα πίσω';
-        const pts = trickPoints(RIDER_SCORE.flip, e.mult, e.count);
-        r.floatText(c.x, c.y - 80, `🔄 ${e.count > 1 ? `${e.count}× ` : ''}${name}! +${pts}`, '#fde047', 28);
+        const kind = e.count === 2 ? 'Διπλή τούμπα' : e.count === 3 ? 'Τριπλή τούμπα' : e.count > 3 ? `${e.count}× τούμπα` : 'Τούμπα';
+        const name = `${kind} ${e.dir === 'front' ? 'μπροστά' : 'πίσω'}`;
+        const pts = trickPoints(flipBase(e.count), e.mult);
+        r.floatText(c.x, c.y - 80, `🔄 ${name}! +${pts}`, '#fde047', e.count > 1 ? 34 : 28);
+        if (e.count > 1) r.burst(c.x, c.y - 30, '#fde047', 26, 260, 200, ['⭐', '🔄', '✨']);
         this.comboFx(e.mult, c);
         this.sound.tone(660, 0.1, 'square', 0.1);
         this.sound.tone(990, 0.14, 'square', 0.1, 0.09);
