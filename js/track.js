@@ -30,7 +30,10 @@ const STEP = 14;
  * @param {string[]} o.obstacles τύποι εμποδίων
  * @param {number} o.hills πολλαπλασιαστής λόφων
  */
-export function generateTrack({ seed, difficulty = 0, water = null, obstacles = ['rock'], hills = 1, checkpointCount = 4 }) {
+export function generateTrack({ seed, difficulty = 0, water = null, obstacles = ['rock'], hills = 1, checkpointCount = 4, style = 'classic' }) {
+  // style 'rider': πολύ πιο δύσκολη πίστα με μεγάλα άλματα πάνω από γκρεμούς, ψηλές πτώσεις,
+  // τραπέζια και μεγάλα εμπόδια (προς το παρόν μόνο στην Αθήνα)
+  const rider = style === 'rider';
   const rnd = mulberry32(hashStr(seed));
   const R = (a, b) => a + (b - a) * rnd();
   const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
@@ -43,7 +46,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   const checkpoints = [];
   const jumps = [];
   const savepoints = [];
-  const SAVE_EVERY = 1200; // σημεία επαναφοράς (χωρίς popup) ανάμεσα στα checkpoints
+  const SAVE_EVERY = rider ? 4200 : 1200; // σημεία επαναφοράς (χωρίς popup) ανάμεσα στα checkpoints
   let lastSave = 0;
   let x = -600;
   let y = 0;
@@ -139,8 +142,9 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
         let type = pick(obstacles);
         if (type === 'crate' && i > 0) type = obstacles.find((t) => t !== 'crate') || 'rock';
         const ox = x + 40;
-        flat(type === 'crate' ? R(300, 360) : R(230, 300));
-        obs.push(makeObstacle(type, ox, y, rnd));
+        const k = rider ? R(1.5, 2.1) : 1;
+        flat((type === 'crate' ? R(300, 360) : R(230, 300)) * (rider ? 1.35 : 1));
+        obs.push(makeObstacle(type, ox, y, rnd, k));
         maybeSave();
       }
     },
@@ -162,7 +166,137 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     },
   };
 
-  const weights = [
+  // ---- χαρακτηριστικά της «rider» πίστας: μεγάλα άλματα και εμπόδια ----
+  // ράμπα που ανεβαίνει h σε μήκος len, με απότομο χείλος (για να πετάξεις)
+  const ramp = (len, h) => curve(len, (t) => -h * t * t);
+  // γκρεμός: κενό πλάτους w, προσγείωση στο ύψος landY (με κατηφόρα προς baseY)
+  const pit = (w, landY, baseY) => {
+    const lipX = x;
+    const lipY = y;
+    const deathY = Math.max(lipY, landY) + 70;
+    const bottom = deathY + 420;
+    push(lipX + 3, bottom);
+    push(lipX + w - 3, bottom);
+    push(lipX + w, landY);
+    gaps.push({ x0: lipX, x1: lipX + w, waterY: deathY, bottom, pit: true, topY: Math.min(lipY, landY) });
+    // κατηφόρα προσγείωσης: ξεκινάει με κλίση, τελειώνει οριζόντια
+    const dh = baseY - landY;
+    curve(Math.max(320, Math.abs(dh) * 3.2), (t) => dh * (1 - (1 - t) * (1 - t)));
+  };
+  // ένταση: η πίστα ξεκινά πιο ήπια και φτάνει στο πλήρες μέγεθος στο ~40% της διαδρομής
+  const TOTAL = 240000 + 160000 * d;
+  const I = () => 0.65 + 0.35 * Math.min(1, Math.max(0, x / (TOTAL * 0.4)));
+  const sign = (pitAhead) => jumps.push({ x: x - 200, rampX: x, pit: pitAhead });
+  Object.assign(features, {
+    whoops() {
+      // μεγάλες «καμπούρες» στη σειρά: σε πετάνε αν δεν κόψεις γκάζι
+      const n = 3 + Math.floor(rnd() * 4);
+      const wl = R(190, 250);
+      const a = R(34, 52) * I();
+      curve(n * wl, (t) => -a * (1 - Math.cos(2 * Math.PI * n * t)) * 0.5);
+    },
+    bigJump() {
+      // φόρα, ψηλή ράμπα, γκρεμός, προσγείωση πιο χαμηλά σε κατηφόρα
+      flat(R(380, 480));
+      sign(true);
+      const baseY = y;
+      const h = R(50, 72) * (0.85 + 0.15 * I());
+      const len = R(170, 210);
+      ramp(len, h);
+      // πόσο μακριά πετάει η μηχανή με φουλ γκάζι (περίπου) → πλάτος γκρεμού λίγο μικρότερο
+      const drop = R(40, 130) * I();
+      const th = Math.atan((2 * h) / len);
+      const v = Math.sqrt(Math.max(200 * 200, 445 * 445 - 2 * 760 * h * 0.7));
+      const vy = v * Math.sin(th);
+      const range = v * Math.cos(th) * ((vy + Math.sqrt(vy * vy + 2 * 760 * drop)) / 760);
+      const w = Math.max(110, Math.min(260, range * R(0.6, 0.78)));
+      const landY = y + drop;
+      pit(w, landY, Math.max(baseY, landY + 30));
+      flat(R(120, 200));
+    },
+    megaDrop() {
+      // μακριά ανηφόρα, μικρό πλατό και ψηλή πτώση σε κατηφόρα
+      const h = R(160, 270) * I();
+      curve(Math.max(R(500, 700), (h * Math.PI) / 2 / 0.5), (t) => -h * (1 - Math.cos(Math.PI * t)) * 0.5);
+      flat(R(120, 200));
+      sign(false);
+      flat(200);
+      const lipX = x;
+      const lipY = y;
+      const drop = h * R(0.75, 0.95);
+      push(lipX + 6, lipY + 18);
+      push(lipX + drop * 0.55, lipY + drop * 0.75);
+      const y0 = y;
+      const target = lipY + h;
+      curve(Math.max(360, (target - y0) * 4), (t) => (target - y0) * (1 - (1 - t) * (1 - t)));
+      flat(R(150, 250));
+    },
+    tabletop() {
+      // ράμπα, ψηλό «τραπέζι» (μερικές φορές με εμπόδιο πάνω), κατηφόρα
+      flat(R(260, 360));
+      sign(false);
+      const h = R(75, 115) * I();
+      ramp(R(150, 190), h);
+      flat(R(260, 420));
+      if (rnd() < 0.5) {
+        obs.push(makeObstacle(pick(obstacles), x + 40, y, rnd, R(1.4, 1.9)));
+        flat(R(260, 320));
+      }
+      curve(R(240, 300), (t) => h * (1 - (1 - t) * (1 - t)));
+      flat(R(120, 200));
+    },
+    block() {
+      // ψηλός μαρμάρινος όγκος: πρέπει να πηδήξεις πάνω του από μια μικρή ράμπα
+      flat(R(280, 360));
+      sign(false);
+      const baseY = y;
+      const h = R(30, 42) * (0.8 + 0.2 * I());
+      ramp(R(110, 135), h);
+      const lipX = x;
+      push(lipX + 6, baseY - h * 0.65);
+      push(lipX + 30, baseY);
+      flat(R(20, 50));
+      const bw = R(110, 220);
+      const bh = h + R(0, 16) * I();
+      obs.push(makeBlock(x + bw / 2, y, bw, bh));
+      flat(bw + bh * 1.5 + R(200, 280));
+    },
+    stairs() {
+      // σκαλοπάτια προς τα κάτω (ή πάνω, με απαλές ράμπες)
+      const n = 3 + Math.floor(rnd() * 3);
+      const down = y < 120;
+      for (let i = 0; i < n; i++) {
+        if (down) {
+          flat(R(140, 200));
+          const s = R(26, 42);
+          push(x + 5, y + s * 0.6);
+          push(x + 20, y + s * 0.4);
+          flat(40);
+        } else {
+          flat(R(140, 200));
+          const s = R(22, 32);
+          curve(R(80, 100), (t) => -s * t * t);
+          flat(R(30, 50));
+        }
+      }
+      flat(R(100, 160));
+    },
+  });
+
+  const weights = rider
+    ? [
+        ['rolling', 1.2],
+        ['climb', 1],
+        ['whoops', 1.6],
+        ['bigJump', 3.2],
+        ['megaDrop', 2],
+        ['tabletop', 2],
+        ['block', 2.4],
+        ['stairs', 1.2],
+        ['obstacle', 2.4],
+        ['hillObstacles', 0.8],
+      ]
+    : [
     ['rolling', 3],
     ['climb', 2],
     ['valley', 1.4],
@@ -170,7 +304,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     ['kicker', 1.2 + d],
     ['obstacle', 5.5],
     ['hillObstacles', 1.5 + d],
-  ];
+      ];
   const totalW = weights.reduce((s, w) => s + w[1], 0);
   let last = '';
   const pickFeature = () => {
@@ -194,15 +328,16 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
 
   // ΤΕΡΑΣΤΙΕΣ πίστες: ~240.000–400.000 μονάδες, δηλαδή 48.000–80.000 από checkpoint σε checkpoint
   // (περίπου 2,5–4 λεπτά οδήγησης ανά κομμάτι, 12–20 λεπτά ανά πίστα)
-  const length = 240000 + 160000 * d;
+  const length = TOTAL;
   const parts = checkpointCount + 1;
   const chunk = length / parts;
   lastSave = x;
   for (let k = 0; k < parts; k++) {
     const end = x + chunk;
-    let guaranteedJump = !!water; // σε κάθε κομμάτι πόλης με νερό υπάρχει σίγουρα ένα άλμα πάνω από νερό
+    let guaranteedJump = !!water && !rider; // σε κάθε κομμάτι πόλης με νερό υπάρχει σίγουρα ένα άλμα πάνω από νερό
     while (x < end) {
       let f = pickFeature();
+      if (rider && y > 200) f = 'climb'; // μην κατεβαίνουμε συνέχεια πιο χαμηλά
       if (guaranteedJump && x > end - chunk / 2) {
         f = 'kicker';
         guaranteedJump = false;
@@ -239,6 +374,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     savepoints,
     startX,
     finishX,
+    style,
     endX: x,
     minY: points.reduce((m, p) => Math.min(m, p.y), Infinity),
     maxY: points.reduce((m, p) => (gaps.some((g) => p.x > g.x0 && p.x < g.x1) ? m : Math.max(m, p.y)), -Infinity),
@@ -247,11 +383,14 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
 
 // Κάθε εμπόδιο έχει "poly": πολυγραμμή από αριστερά προς τα δεξιά πάνω από την κορυφή του
 // (έτσι οι κάθετες της είναι προς τα έξω), με άκρα πάνω στο έδαφος.
-export function makeObstacle(type, x, baseY, rnd = Math.random) {
-  const o = { type, x, y: baseY, seed: Math.floor(rnd() * 1e6) };
+export function makeObstacle(type, x, baseY, rnd = Math.random, k = 1) {
+  const o = { type, x, y: baseY, seed: Math.floor(rnd() * 1e6), k };
   // Στρογγυλό εμπόδιο πάνω σε μικρό ανάχωμα: η πολυγραμμή ξεκινά από το έδαφος, ανεβαίνει
   // εφαπτομενικά (~37°) στην έλλειψη, περνά από την κορυφή και κατεβαίνει συμμετρικά.
   const mound = (rx, ry, L) => {
+    rx *= k;
+    ry *= k;
+    L *= k;
     const cy = baseY - ry;
     // εφαπτομένη από το σημείο (-L, -ry) προς κύκλο ακτίνας ry (σε κλίμακα y), μετά τεντώνουμε σε x
     const D = Math.hypot(L, ry);
@@ -271,32 +410,32 @@ export function makeObstacle(type, x, baseY, rnd = Math.random) {
   switch (type) {
     case 'column': {
       // πεσμένος μαρμάρινος κίονας (ξαπλωμένος κύλινδρος)
-      o.r = 12;
+      o.r = 12 * k;
       o.poly = mound(12, 12, 36);
       break;
     }
     case 'barrel':
-      o.r = 12;
+      o.r = 12 * k;
       o.poly = mound(12, 12, 36);
       break;
     case 'log':
-      o.r = 10;
+      o.r = 10 * k;
       o.poly = mound(10, 10, 30);
       break;
     case 'hay':
-      o.r = 14;
+      o.r = 14 * k;
       o.poly = mound(14, 14, 42);
       break;
     case 'amphora': {
       // ξαπλωμένος αμφορέας
-      o.rx = 24;
-      o.ry = 10;
+      o.rx = 24 * k;
+      o.ry = 10 * k;
       o.poly = mound(24, 10, 30);
       break;
     }
     case 'rock': {
-      const h = 14 + rnd() * 8;
-      const w = 84 + rnd() * 20;
+      const h = (14 + rnd() * 8) * k;
+      const w = (84 + rnd() * 20) * k;
       o.h = h;
       o.w = w;
       o.poly = [
@@ -312,16 +451,35 @@ export function makeObstacle(type, x, baseY, rnd = Math.random) {
     default: {
       // κιβώτιο με σανίδες-ράμπες μπροστά και πίσω
       o.type = 'crate';
-      const s = 22;
+      const s = 22 * k;
       o.s = s;
       o.poly = [
-        { x: x - s / 2 - 34, y: baseY },
+        { x: x - s / 2 - 34 * k, y: baseY },
         { x: x - s / 2, y: baseY - s },
         { x: x + s / 2, y: baseY - s },
-        { x: x + s / 2 + 30, y: baseY },
+        { x: x + s / 2 + 30 * k, y: baseY },
       ];
       break;
     }
   }
   return o;
+}
+
+/** Μεγάλος μαρμάρινος όγκος (σχεδόν κάθετα τοιχώματα) – για την «rider» πίστα. */
+export function makeBlock(x, baseY, w, h) {
+  return {
+    type: 'block',
+    x,
+    y: baseY,
+    w,
+    h,
+    poly: [
+      { x: x - w / 2 - 2, y: baseY },
+      { x: x - w / 2, y: baseY - h + 4 },
+      { x: x - w / 2 + 4, y: baseY - h },
+      { x: x + w / 2 - 6, y: baseY - h },
+      { x: x + w / 2 + h * 0.4, y: baseY - h * 0.55 },
+      { x: x + w / 2 + h * 1.5, y: baseY },
+    ],
+  };
 }

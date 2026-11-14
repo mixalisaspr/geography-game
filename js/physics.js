@@ -23,6 +23,9 @@ export const CFG = {
   dt: 1 / 120,
 };
 
+// Στην «rider» πίστα η μηχανή γυρίζει πολύ πιο εύκολα στον αέρα (για τούμπες)
+export const RIDER_HANDLING = { leanAir: 22, maxAngVel: 10, airDamp: 0.6 };
+
 // Τοπικές θέσεις των σημείων (κέντρο ανάμεσα στους τροχούς, y προς τα κάτω)
 const LOCAL = [
   { x: -CFG.wheelBase / 2, y: 0 },
@@ -157,7 +160,8 @@ export class World {
 }
 
 export class Bike {
-  constructor() {
+  constructor(handling = {}) {
+    this.cfg = { ...CFG, airDamp: 1.2, ...handling };
     this.p = LOCAL.map(() => ({ x: 0, y: 0, vx: 0, vy: 0, px: 0, py: 0 }));
     this.spin = [0, 0];
     this.wheelAngle = [0, 0];
@@ -236,7 +240,8 @@ export class Bike {
     // κλίση: γκάζι → μύτη πάνω, φρένο → μύτη κάτω (κυρίως στον αέρα)
     const lean = (gas ? -1 : 0) + (brake ? 1 : 0);
     // στα μικρά «πηδηματάκια» δεν γέρνουμε αμέσως – μόνο σε πραγματικά άλματα
-    const inAir = !grounded && this.airTime > CFG.airLeanDelay;
+    const C = this.cfg;
+    const inAir = !grounded && this.airTime > C.airLeanDelay;
     let alpha = 0;
     if (grounded) {
       // γωνία ως προς την κλίση του εδάφους (αρνητική = μύτη πάνω)
@@ -247,11 +252,11 @@ export class Bike {
       // υποβοήθηση: αν η σούζα πάει να γίνει ανατροπή, κατεβάζουμε απαλά τη μύτη
       if (alive && rel < -CFG.assistStart) alpha += CFG.wheelieAssist * Math.min(1, (-rel - CFG.assistStart) / 0.3);
     } else if (inAir) {
-      alpha = lean * CFG.leanAir;
+      alpha = lean * C.leanAir;
     }
     if (alpha !== 0) {
       const w = this.angularVelocity();
-      if (!(Math.sign(w) === Math.sign(alpha) && Math.abs(w) > CFG.maxAngVel)) {
+      if (!(Math.sign(w) === Math.sign(alpha) && Math.abs(w) > C.maxAngVel)) {
         let cx = 0;
         let cy = 0;
         for (const p of P) {
@@ -269,7 +274,7 @@ export class Bike {
     if (lean === 0 && !grounded) {
       // ελαφριά απόσβεση περιστροφής στον αέρα για πιο «φιλική» αίσθηση
       const w = this.angularVelocity();
-      const damp = -w * 1.2 * dt;
+      const damp = -w * C.airDamp * dt;
       let cx = 0;
       let cy = 0;
       for (const p of P) {
@@ -405,7 +410,14 @@ export class LevelSim {
   constructor(track) {
     this.track = track;
     this.world = new World(track);
-    this.bike = new Bike();
+    this.rider = track.style === 'rider';
+    this.bike = new Bike(this.rider ? RIDER_HANDLING : {});
+    this.maxX = track.startX; // πιο μακριά που έφτασε ο παίκτης (για πόντους απόστασης)
+    this.flips = 0;
+    this.airRot = 0; // περιστροφή στον αέρα (για τούμπες)
+    this.prevAngle = 0;
+    this.pendingFlips = 0;
+    this.landTimer = 0;
     this.reached = -1; // τελευταίο checkpoint που περάσαμε
     this.savedX = track.startX; // τελευταίο σημείο επαναφοράς (checkpoint ή σημαιάκι)
     this.nextSave = 0;
@@ -421,8 +433,39 @@ export class LevelSim {
   respawn(x) {
     const gy = this.world.surfaceY(x);
     this.bike.place(x, gy, 0);
-    // μικρή ώθηση ώστε η μηχανή να «κάτσει» στο έδαφος
+    this.airRot = 0;
+    this.prevAngle = 0;
+    this.pendingFlips = 0;
     this.state = 'running';
+  }
+
+  /** Μετράει τις πλήρεις τούμπες στον αέρα· μετράνε μόνο αν προσγειωθείς χωρίς να πέσεις. */
+  trackFlips(events) {
+    const bike = this.bike;
+    const a = bike.angle;
+    const da = wrapAngle(a - this.prevAngle);
+    this.prevAngle = a;
+    if (!bike.grounded) {
+      this.airRot += da;
+      this.landTimer = 0;
+      return;
+    }
+    if (this.airRot !== 0) {
+      const n = Math.floor((Math.abs(this.airRot) + 0.6) / (2 * Math.PI));
+      if (n > 0) {
+        this.pendingFlips += n;
+        this.landTimer = 0.5;
+      }
+      this.airRot = 0;
+    }
+    if (this.pendingFlips > 0) {
+      this.landTimer -= CFG.dt;
+      if (this.landTimer <= 0) {
+        this.flips += this.pendingFlips;
+        events.push({ type: 'flip', count: this.pendingFlips });
+        this.pendingFlips = 0;
+      }
+    }
   }
 
   respawnX() {
@@ -468,7 +511,7 @@ export class LevelSim {
         for (const p of bike.p) {
           const g = this.world.gapAt(p.x);
           if (g && p.y > g.waterY + 4) {
-            reason = 'water';
+            reason = g.pit ? 'fall' : 'water';
             break;
           }
         }
@@ -483,6 +526,8 @@ export class LevelSim {
         return;
       }
       const cx = bike.center.x;
+      if (cx > this.maxX) this.maxX = Math.min(cx, this.track.finishX);
+      this.trackFlips(events);
       // τα σημαιάκια είναι ταξινομημένα: ελέγχουμε μόνο το επόμενο
       const saves = this.track.savepoints || [];
       while (this.nextSave < saves.length && saves[this.nextSave] <= this.savedX) this.nextSave++;

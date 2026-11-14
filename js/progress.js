@@ -98,6 +98,24 @@ export function runPoints(correct, crashes) {
 }
 
 /**
+ * Νέο σύστημα πόντων (προς το παρόν μόνο στην «rider» πίστα της Αθήνας):
+ * κερδίζεις πόντους όσο προχωράς, με τούμπες και με το quiz· οι πτώσεις αφαιρούν,
+ * αλλά το σκορ δεν πέφτει ποτέ κάτω από το 0.
+ */
+export const RIDER_SCORE = {
+  distanceUnit: 500, // +1 πόντος για κάθε τόσες μονάδες νέας διαδρομής
+  flip: 10, // κάθε πλήρης τούμπα με ασφαλή προσγείωση
+  quiz: 20, // κάθε σωστή απάντηση
+  crash: 10, // κάθε πτώση
+};
+
+/** Πρόσθεση στο σκορ χωρίς να πέφτει κάτω από το μηδέν. */
+export const addScore = (score, delta) => Math.max(0, score + delta);
+
+/** Πόντοι απόστασης για όσο έχει προχωρήσει ο παίκτης (μετράει μόνο το πιο μακρινό σημείο). */
+export const distancePoints = (maxX, startX) => Math.max(0, Math.floor((maxX - startX) / RIDER_SCORE.distanceUnit));
+
+/**
  * Καταγράφει αποτέλεσμα πόλης. Επιστρέφει { countryCompleted, newBest }.
  * stars: 1..3, quiz: όλες οι ερωτήσεις σωστές, points: πόντοι της διαδρομής
  */

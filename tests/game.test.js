@@ -5,10 +5,13 @@ import { COUNTRIES, COUNTRY_IDS, START_COUNTRY, allItems, cityDifficulty, links 
 import { mapLayout } from '../js/map-layout.js';
 import { generateTrack } from '../js/track.js';
 import { buildTrack, trackForCity } from '../js/levels.js';
-import { LevelSim } from '../js/physics.js';
+import { LevelSim, RIDER_HANDLING, CFG } from '../js/physics.js';
 import { LANDMARKS } from '../js/render.js';
 import { finalQuiz } from '../js/ui.js';
 import {
+  RIDER_SCORE,
+  addScore,
+  distancePoints,
   availableCountries,
   canPlayCountry,
   emptySave,
@@ -110,7 +113,8 @@ test('η πίστα είναι ντετερμινιστική, μεγάλη, κ�
     for (let i = 1; i < stops.length; i++)
       assert.ok(stops[i] - stops[i - 1] >= 45000, `${city.id}: μόνο ${Math.round(stops[i] - stops[i - 1])} από checkpoint σε checkpoint`);
     assert.ok(a.finishX - a.startX >= 240000, `${city.id}: πολύ μικρή πίστα (${Math.round(a.finishX)})`);
-    assert.ok(a.obstacles.length >= 200, `${city.id}: λίγα εμπόδια (${a.obstacles.length})`);
+    if (city.rider) assert.ok(a.obstacles.length >= 80 && a.gaps.length >= 20, `${city.id}: λίγα εμπόδια/γκρεμοί`);
+    else assert.ok(a.obstacles.length >= 200, `${city.id}: λίγα εμπόδια (${a.obstacles.length})`);
     let prev = a.startX;
     for (const cp of a.checkpoints) {
       assert.ok(cp > prev, `${city.id}: checkpoints εκτός σειράς`);
@@ -150,8 +154,9 @@ test('ανάμεσα στα checkpoints υπάρχουν σημεία επανα
   for (const city of allCities()) {
     const t = trackForCity(city);
     const stops = [t.startX, ...t.checkpoints, ...t.savepoints, t.finishX].sort((a, b) => a - b);
+    const maxGap = city.rider ? 7500 : 3600; // στην rider πίστα τα σημαιάκια είναι λιγότερα (περίπου το 1/3)
     for (let i = 1; i < stops.length; i++) {
-      assert.ok(stops[i] - stops[i - 1] < 3600, `${city.id}: ${Math.round(stops[i] - stops[i - 1])} μονάδες χωρίς σημείο επαναφοράς`);
+      assert.ok(stops[i] - stops[i - 1] < maxGap, `${city.id}: ${Math.round(stops[i] - stops[i - 1])} μονάδες χωρίς σημείο επαναφοράς`);
     }
   }
 });
@@ -170,7 +175,7 @@ test('μετά από πτώση ξαναξεκινάς από το τελευτ
 test('κάθε άλμα έχει πινακίδα προειδοποίησης πριν από τη ράμπα', () => {
   for (const city of allCities()) {
     const t = trackForCity(city);
-    for (const g of t.gaps) assert.ok(t.jumps.some((j) => j.water && j.x < g.x0 && g.x0 - j.x < 600), `${city.id}: κενό χωρίς πινακίδα`);
+    for (const g of t.gaps) assert.ok(t.jumps.some((j) => (j.water || j.pit) && j.x < g.x0 && g.x0 - j.x < 600), `${city.id}: κενό χωρίς πινακίδα`);
   }
 });
 
@@ -280,4 +285,69 @@ test('ο service worker κρατάει offline όλα τα αρχεία JavaScri
     ...readdirSync(new URL('../js/data', import.meta.url)).filter((f) => f.endsWith('.js')).map((f) => `./js/data/${f}`),
   ];
   for (const f of files) assert.ok(sw.includes(`'${f}'`), `λείπει από το sw.js: ${f}`);
+});
+
+test('η Αθήνα είναι η νέα «rider» πίστα: μεγάλα άλματα, γκρεμοί, λιγότερα σημαιάκια', () => {
+  const athens = COUNTRIES.greece.cities[0];
+  assert.equal(athens.rider, true);
+  for (const c of allCities()) if (c !== athens) assert.ok(!c.rider, `${c.id}: η rider πίστα είναι προς το παρόν μόνο στην Αθήνα`);
+  const t = trackForCity(athens);
+  assert.equal(t.style, 'rider');
+  const classic = generateTrack({ seed: `geomichani:${athens.id}`, difficulty: 0, obstacles: athens.theme.obstacles, hills: athens.theme.hills });
+  assert.ok(t.savepoints.length <= classic.savepoints.length * 0.4, `πολλά σημαιάκια (${t.savepoints.length} / ${classic.savepoints.length})`);
+  assert.ok(t.gaps.every((g) => g.pit), 'στην Αθήνα τα κενά είναι γκρεμοί, όχι νερό');
+  assert.ok(t.maxY - t.minY > classic.maxY - classic.minY + 150, 'πολύ μεγαλύτερες υψομετρικές διαφορές');
+  assert.ok(t.obstacles.some((o) => o.type === 'block'), 'ψηλοί μαρμάρινοι όγκοι');
+  assert.ok(RIDER_HANDLING.leanAir > CFG.leanAir, 'η μηχανή γυρίζει πιο εύκολα στον αέρα');
+});
+
+test('στη rider πίστα ο απλός παίκτης «άσε το γκάζι» δεν αρκεί – χρειάζεται έλεγχος στον αέρα', () => {
+  const sim = new LevelSim(trackForCity(COUNTRIES.greece.cities[0]));
+  const hist = [];
+  for (let t = 0; t < 300 && sim.state !== 'finished'; t += 1 / 60) {
+    const b = sim.bike;
+    hist.push(b.angle);
+    const a = hist[Math.max(0, hist.length - 16)];
+    let inp;
+    if (!b.grounded) inp = { gas: a > -0.2, brake: a < -0.7 };
+    else {
+      const n = b.contact[0] || b.contact[1];
+      inp = { gas: b.angle - Math.atan2(n.x, -n.y) > -0.45, brake: false };
+    }
+    sim.update(1 / 60, inp);
+  }
+  assert.ok(sim.crashes >= 5, `μόνο ${sim.crashes} πτώσεις`);
+});
+
+test('rider πόντοι: κερδίζεις όσο προχωράς και δεν πέφτεις ποτέ κάτω από 0', () => {
+  assert.equal(addScore(5, -RIDER_SCORE.crash), 0);
+  assert.equal(addScore(0, -RIDER_SCORE.crash), 0);
+  assert.equal(addScore(30, -RIDER_SCORE.crash), 30 - RIDER_SCORE.crash);
+  assert.equal(distancePoints(0, 0), 0);
+  assert.equal(distancePoints(RIDER_SCORE.distanceUnit * 3 + 10, 0), 3);
+  // στην πίστα: μετράει μόνο το πιο μακρινό σημείο, οπότε μια επαναφορά δεν δίνει ξανά πόντους
+  const sim = new LevelSim(trackForCity(COUNTRIES.greece.cities[0]));
+  for (let i = 0; i < 600; i++) sim.update(1 / 60, { gas: true, brake: false });
+  assert.ok(sim.maxX > sim.track.startX + 1000);
+  const far = sim.maxX;
+  sim.respawn(sim.track.startX);
+  sim.update(1 / 60, { gas: false, brake: false });
+  assert.equal(sim.maxX, far);
+});
+
+test('μια πλήρης τούμπα στον αέρα μετράει όταν προσγειωθείς', () => {
+  const t = generateTrack({ seed: 'flat', difficulty: 0, water: null, obstacles: ['rock'], style: 'rider' });
+  const sim = new LevelSim(t);
+  sim.bike.place(100, sim.world.groundY(100) - 600, 0);
+  sim.update(1 / 120, { gas: false, brake: false });
+  // περιστρέφουμε «με το χέρι» μια πλήρη στροφή πριν από την προσγείωση
+  sim.airRot = -2 * Math.PI;
+  let flips = 0;
+  for (let i = 0; i < 240 * 4 && sim.state === 'running'; i++) {
+    const ev = sim.update(1 / 120, { gas: false, brake: false });
+    flips += ev.filter((e) => e.type === 'flip').reduce((s, e) => s + e.count, 0);
+    if (flips) break;
+  }
+  assert.equal(flips, 1);
+  assert.equal(sim.flips, 1);
 });
