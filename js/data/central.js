@@ -80,7 +80,7 @@ export const CENTRAL = {
     language: 'Ιταλικά',
     currency: 'Ευρώ (€)',
     lonLat: [12.5, 42.8],
-    neighbors: ['austria', 'slovenia', 'switzerland'],
+    neighbors: ['austria', 'slovenia', 'switzerland', 'france'],
     sea: ['greece'],
     intro: 'Η χώρα σε σχήμα μπότας! Είναι από τις χώρες με τα περισσότερα μνημεία παγκόσμιας κληρονομιάς της UNESCO, και η πατρίδα της πίτσας.',
     cities: [

@@ -10,7 +10,7 @@ export const CENTRAL2 = {
     language: 'Γερμανικά, Γαλλικά, Ιταλικά και Ρομανικά',
     currency: 'Ελβετικό φράγκο',
     lonLat: [8.2, 46.8],
-    neighbors: ['austria', 'italy', 'germany'],
+    neighbors: ['austria', 'italy', 'germany', 'france'],
     intro: 'Μια ορεινή χώρα με λίμνες και Άλπεις, που έχει τέσσερις επίσημες γλώσσες! Είναι γνωστή για τις σοκολάτες, τα τυριά και τα ρολόγια της.',
     cities: [
       city('bern', 'Βέρνη', 'Η πρωτεύουσα της Ελβετίας, με μια μεσαιωνική παλιά πόλη πάνω σε μια στροφή του ποταμού Άαρε.', [
@@ -45,7 +45,7 @@ export const CENTRAL2 = {
     language: 'Γερμανικά',
     currency: 'Ευρώ (€)',
     lonLat: [10.4, 51.1],
-    neighbors: ['austria', 'switzerland', 'czechia', 'poland'],
+    neighbors: ['austria', 'switzerland', 'czechia', 'poland', 'france', 'luxembourg', 'belgium', 'netherlands'],
     intro: 'Η χώρα με τον μεγαλύτερο πληθυσμό στην Ευρωπαϊκή Ένωση. Οι Γερμανοί φτιάχνουν πάνω από 1.000 είδη λουκάνικων και χιλιάδες είδη ψωμιού!',
     cities: [
       city('berlin', 'Βερολίνο', 'Η πρωτεύουσα της Γερμανίας, μια μεγάλη πόλη με πολλή ιστορία, μουσεία και πάρκα.', [
