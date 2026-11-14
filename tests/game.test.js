@@ -299,6 +299,7 @@ test('η Αθήνα είναι η νέα «rider» πίστα: μεγάλα άλ
   assert.ok(t.maxY - t.minY > classic.maxY - classic.minY + 150, 'πολύ μεγαλύτερες υψομετρικές διαφορές');
   assert.ok(t.obstacles.some((o) => o.type === 'block'), 'ψηλοί μαρμάρινοι όγκοι');
   assert.ok(RIDER_HANDLING.leanAir > CFG.leanAir, 'η μηχανή γυρίζει πιο εύκολα στον αέρα');
+  assert.ok(RIDER_HANDLING.maxSpin > CFG.maxSpin, 'και πιάνει μεγαλύτερη ταχύτητα');
 });
 
 test('στη rider πίστα ο απλός παίκτης «άσε το γκάζι» δεν αρκεί – χρειάζεται έλεγχος στον αέρα', () => {
