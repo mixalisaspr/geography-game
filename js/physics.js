@@ -407,6 +407,7 @@ export class LevelSim {
     this.world = new World(track);
     this.bike = new Bike();
     this.reached = -1; // τελευταίο checkpoint που περάσαμε
+    this.savedX = track.startX; // τελευταίο σημείο επαναφοράς (checkpoint ή σημαιάκι)
     this.state = 'running'; // running | crashed | finished
     this.time = 0;
     this.crashes = 0;
@@ -424,7 +425,8 @@ export class LevelSim {
   }
 
   respawnX() {
-    return this.reached >= 0 ? this.track.checkpoints[this.reached] : this.track.startX;
+    const cp = this.reached >= 0 ? this.track.checkpoints[this.reached] : this.track.startX;
+    return Math.max(cp, this.savedX);
   }
 
   get progress() {
@@ -480,6 +482,12 @@ export class LevelSim {
         return;
       }
       const cx = bike.center.x;
+      for (const sp of this.track.savepoints || []) {
+        if (sp > this.savedX && cx >= sp) {
+          this.savedX = sp;
+          events.push({ type: 'savepoint', x: sp });
+        }
+      }
       const next = this.reached + 1;
       if (next < this.track.checkpoints.length && cx >= this.track.checkpoints[next]) {
         this.reached = next;
