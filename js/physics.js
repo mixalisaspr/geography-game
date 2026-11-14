@@ -24,7 +24,8 @@ export const CFG = {
 };
 
 // Στην «rider» πίστα η μηχανή γυρίζει πολύ πιο εύκολα στον αέρα (για τούμπες)
-export const RIDER_HANDLING = { leanAir: 22, maxAngVel: 10, airDamp: 0.6 };
+// και πιάνει μεγαλύτερη ταχύτητα (~600 αντί για ~460 μονάδες/s)
+export const RIDER_HANDLING = { leanAir: 34, maxAngVel: 15, airDamp: 7, maxSpin: 43, motorAcc: 180 };
 
 // Τοπικές θέσεις των σημείων (κέντρο ανάμεσα στους τροχούς, y προς τα κάτω)
 const LOCAL = [
@@ -291,7 +292,7 @@ export class Bike {
 
     // μοτέρ / φρένο στις περιστροφές των τροχών
     if (gas) {
-      this.spin[0] = Math.min(CFG.maxSpin, this.spin[0] + CFG.motorAcc * dt);
+      this.spin[0] = Math.min(C.maxSpin, this.spin[0] + C.motorAcc * dt);
     } else {
       this.spin[0] *= 1 - 0.25 * dt;
     }
