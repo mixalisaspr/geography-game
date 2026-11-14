@@ -192,8 +192,9 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   flat(800); // x = 200
   const startX = 0;
 
-  // ΤΕΡΑΣΤΙΕΣ πίστες: ~60.000–100.000 μονάδες (περίπου 3–6 λεπτά οδήγησης)
-  const length = 60000 + 40000 * d;
+  // ΤΕΡΑΣΤΙΕΣ πίστες: ~240.000–400.000 μονάδες, δηλαδή 48.000–80.000 από checkpoint σε checkpoint
+  // (περίπου 2,5–4 λεπτά οδήγησης ανά κομμάτι, 12–20 λεπτά ανά πίστα)
+  const length = 240000 + 160000 * d;
   const parts = checkpointCount + 1;
   const chunk = length / parts;
   lastSave = x;

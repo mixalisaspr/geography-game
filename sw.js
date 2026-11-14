@@ -1,5 +1,5 @@
 // Service worker: κρατά όλα τα αρχεία του παιχνιδιού για να παίζεται offline.
-const VERSION = 'geomichani-v5';
+const VERSION = 'geomichani-v6';
 const FILES = [
   './',
   './index.html',
