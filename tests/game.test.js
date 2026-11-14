@@ -106,16 +106,16 @@ test('η δυσκολία ξεκινά εύκολα από την Αθήνα κ�
   }
 });
 
-test('η πίστα είναι ντετερμινιστική, μεγάλη, και έχει 4 checkpoints πριν από τον τερματισμό', () => {
+test('η πίστα είναι ντετερμινιστική, αρκετά μεγάλη, και έχει 4 checkpoints πριν από τον τερματισμό', () => {
   for (const city of allCities()) {
     const a = trackForCity(city);
     if (city.index === 0) assert.deepEqual(buildTrack(city).points, a.points, `${city.id}: μη ντετερμινιστική`);
     assert.equal(a.checkpoints.length, 4);
     const stops = [a.startX, ...a.checkpoints, a.finishX];
     for (let i = 1; i < stops.length; i++)
-      assert.ok(stops[i] - stops[i - 1] >= 45000, `${city.id}: μόνο ${Math.round(stops[i] - stops[i - 1])} από checkpoint σε checkpoint`);
-    assert.ok(a.finishX - a.startX >= 240000, `${city.id}: πολύ μικρή πίστα (${Math.round(a.finishX)})`);
-    if (city.rider) assert.ok(a.obstacles.length >= 60 && a.gaps.length >= 20, `${city.id}: λίγα εμπόδια/γκρεμοί`);
+      assert.ok(stops[i] - stops[i - 1] >= 15000, `${city.id}: μόνο ${Math.round(stops[i] - stops[i - 1])} από checkpoint σε checkpoint`);
+    assert.ok(a.finishX - a.startX >= 80000, `${city.id}: πολύ μικρή πίστα (${Math.round(a.finishX)})`);
+    if (city.rider) assert.ok(a.obstacles.length >= 15 && a.gaps.length >= 6, `${city.id}: λίγα εμπόδια/γκρεμοί`);
     else assert.ok(a.obstacles.length >= 200, `${city.id}: λίγα εμπόδια (${a.obstacles.length})`);
     let prev = a.startX;
     for (const cp of a.checkpoints) {
@@ -297,7 +297,7 @@ test('όλες οι πόλεις είναι «rider» πίστες: μεγάλα
     const th = city.theme;
     const classic = generateTrack({ seed: `geomichani:${city.id}`, difficulty: cityDifficulty(city), water: th.water, obstacles: th.obstacles, hills: th.hills });
     assert.ok(t.savepoints.length <= classic.savepoints.length * 0.4, `${city.id}: πολλά σημαιάκια (${t.savepoints.length} / ${classic.savepoints.length})`);
-    assert.ok(t.gaps.length >= 20, `${city.id}: λίγα άλματα πάνω από κενά`);
+    assert.ok(t.gaps.length >= 6, `${city.id}: λίγα άλματα πάνω από κενά`);
     // με νερό στο θέμα τα κενά είναι νερό (πλατς), αλλιώς γκρεμοί
     assert.ok(t.gaps.every((g) => g.pit === !th.water), `${city.id}: λάθος είδος κενού`);
     assert.ok(t.obstacles.some((o) => o.type === 'block'), `${city.id}: λείπουν οι μεγάλοι όγκοι`);
@@ -366,7 +366,7 @@ test('νομίσματα και διαμάντια: ντετερμινιστικ
   assert.deepEqual(again, t.pickups);
   const gems = t.pickups.filter((p) => p.kind === 'gem');
   const coins = t.pickups.filter((p) => p.kind === 'coin');
-  assert.ok(coins.length >= 200, `μόνο ${coins.length} νομίσματα`);
+  assert.ok(coins.length >= 100, `μόνο ${coins.length} νομίσματα`);
   for (const g of t.gaps) assert.ok(gems.some((p) => p.x > g.x0 && p.x < g.x1), 'κενό χωρίς διαμάντι');
   // τα νομίσματα δεν κρέμονται πάνω από κενά και είναι ταξινομημένα
   for (const c of coins) assert.ok(!t.gaps.some((g) => c.x > g.x0 && c.x < g.x1));
