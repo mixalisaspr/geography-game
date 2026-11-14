@@ -1,7 +1,7 @@
 // Πρόοδος του παίκτη: ποιες πόλεις/χώρες ολοκληρώθηκαν, συλλογή, ποιες χώρες είναι διαθέσιμες.
 // Οι συναρτήσεις δέχονται το αντικείμενο `data`, ώστε να μπορούν να ελεγχθούν και χωρίς browser.
 
-import { COUNTRIES, START_COUNTRY } from './data/countries.js';
+import { COUNTRIES, START_COUNTRY, links } from './data/countries.js';
 
 const KEY = 'geomichani-save-v1';
 
@@ -72,9 +72,9 @@ export function availableCountries(data) {
   }
   const out = new Set();
   const last = data.lastCompleted && done.has(data.lastCompleted) ? data.lastCompleted : [...done].pop();
-  for (const n of COUNTRIES[last].neighbors) if (!done.has(n)) out.add(n);
+  for (const n of links(last)) if (!done.has(n)) out.add(n);
   if (!out.size) {
-    for (const d of done) for (const n of COUNTRIES[d].neighbors) if (!done.has(n)) out.add(n);
+    for (const d of done) for (const n of links(d)) if (!done.has(n)) out.add(n);
   }
   for (const id of Object.keys(COUNTRIES)) if (!done.has(id) && isCountryStarted(data, id)) out.add(id);
   return [...out];

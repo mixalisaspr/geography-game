@@ -15,6 +15,9 @@
 //   deco:       δέντρα (olive, cypress, pine, palm, birch)
 //   hills:      πόσο λοφώδης είναι η πίστα (πολλαπλασιαστής)
 //
+// Χώρα: `neighbors` = κοινά σύνορα στη στεριά, `sea` = σύνδεση με πλοίο/γέφυρα/σήραγγα.
+// Και τα δύο πρέπει να είναι αμφίδρομα (το ελέγχει τεστ).
+//
 // Κάθε πόλη έχει:
 //   items: 2 αντικείμενα (με `fact`: «Ήξερες ότι…» για το ίδιο το αντικείμενο)
 //   infos: 2 πληροφορίες που εμφανίζονται στη διαδρομή
@@ -22,23 +25,8 @@
 // Η ερώτηση πρέπει να απαντιέται από όσα έδειξε το παιχνίδι στη διαδρομή.
 // Η ΠΡΩΤΗ απάντηση είναι η σωστή – ανακατεύονται στο παιχνίδι.
 
-const BASE = {
-  sky: ['#69c0f5', '#fde8c4'],
-  far: '#9fb4c8',
-  mid: '#86a865',
-  ground: '#9c7349',
-  top: '#78ad45',
-  surface: 'grass',
-  water: null,
-  waterColor: '#2b8fd8',
-  landmarks: [],
-  obstacles: ['rock', 'crate'],
-  deco: ['pine'],
-  hills: 1,
-  snow: false,
-  balloons: false,
-};
-const T = (o) => ({ ...BASE, ...o });
+import { T } from './helpers.js';
+import { REGIONS } from './regions.js';
 
 export const START_COUNTRY = 'greece';
 
@@ -50,7 +38,7 @@ export const COUNTRIES = {
     capital: 'Αθήνα',
     language: 'Ελληνικά',
     currency: 'Ευρώ (€)',
-    map: { x: 570, y: 610 }, // θέση στον σχηματικό χάρτη
+    lonLat: [22.5, 39.3], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['albania', 'north-macedonia', 'bulgaria', 'turkey'],
     intro:
       'Η χώρα του ήλιου και της θάλασσας, με περίπου 6.000 νησιά και νησίδες! Εδώ γεννήθηκαν η δημοκρατία, το θέατρο και οι Ολυμπιακοί Αγώνες.',
@@ -200,7 +188,7 @@ export const COUNTRIES = {
     capital: 'Τίρανα',
     language: 'Αλβανικά',
     currency: 'Λεκ',
-    map: { x: 400, y: 560 }, // θέση στον σχηματικό χάρτη
+    lonLat: [20.0, 41.1], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['greece', 'north-macedonia', 'montenegro'],
     intro:
       'Οι Αλβανοί ονομάζουν τη χώρα τους «Σκιπερία» (Shqipëria), που συχνά μεταφράζεται «χώρα των αετών». Γι’ αυτό στη σημαία της υπάρχει ένας μαύρος δικέφαλος αετός.',
@@ -344,7 +332,7 @@ export const COUNTRIES = {
     capital: 'Σκόπια',
     language: 'Μακεδονική (σλαβική γλώσσα) και Αλβανικά',
     currency: 'Δηνάριο',
-    map: { x: 570, y: 450 }, // θέση στον σχηματικό χάρτη
+    lonLat: [21.7, 41.6], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['greece', 'albania', 'bulgaria', 'serbia'],
     intro:
       'Μια ορεινή χώρα χωρίς θάλασσα, αλλά με όμορφες λίμνες. Ονομάζεται «Βόρεια Μακεδονία» από το 2019, μετά τη Συμφωνία των Πρεσπών με την Ελλάδα.',
@@ -488,7 +476,7 @@ export const COUNTRIES = {
     capital: 'Σόφια',
     language: 'Βουλγαρικά',
     currency: 'Ευρώ (€) – από το 2026· πριν ήταν το λεβ',
-    map: { x: 810, y: 400 }, // θέση στον σχηματικό χάρτη
+    lonLat: [25.3, 42.7], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['greece', 'north-macedonia', 'serbia', 'romania', 'turkey'],
     intro:
       'Μια χώρα με βουνά, τη Μαύρη Θάλασσα και τριαντάφυλλα. Παράξενο αλλά αληθινό: πολλοί Βούλγαροι κουνάνε το κεφάλι πάνω-κάτω για να πουν «όχι» και δεξιά-αριστερά για να πουν «ναι»!',
@@ -632,7 +620,7 @@ export const COUNTRIES = {
     capital: 'Άγκυρα',
     language: 'Τουρκικά',
     currency: 'Τουρκική λίρα',
-    map: { x: 1040, y: 560 }, // θέση στον σχηματικό χάρτη
+    lonLat: [31.0, 39.6], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['greece', 'bulgaria'],
     intro:
       'Μια μεγάλη χώρα που απλώνεται σε δύο ηπείρους: ένα μικρό κομμάτι της βρίσκεται στην Ευρώπη και το μεγαλύτερο στην Ασία (Μικρά Ασία).',
@@ -779,7 +767,7 @@ export const COUNTRIES = {
     capital: 'Βελιγράδι',
     language: 'Σερβικά',
     currency: 'Σερβικό δηνάριο',
-    map: { x: 530, y: 270 }, // θέση στον σχηματικό χάρτη
+    lonLat: [20.9, 44.1], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['north-macedonia', 'bulgaria', 'romania', 'hungary', 'croatia', 'bosnia', 'montenegro'],
     intro:
       'Μια χώρα χωρίς θάλασσα, που τη διασχίζει ο μεγάλος ποταμός Δούναβης. Τα σερβικά γράφονται και με κυριλλικά και με λατινικά γράμματα!',
@@ -923,7 +911,7 @@ export const COUNTRIES = {
     capital: 'Ποντγκόριτσα',
     language: 'Μαυροβουνιακά',
     currency: 'Ευρώ (€)',
-    map: { x: 330, y: 440 }, // θέση στον σχηματικό χάρτη
+    lonLat: [19.3, 42.8], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['albania', 'serbia', 'bosnia', 'croatia'],
     intro:
       'Το όνομά του σημαίνει «μαύρο βουνό», από τα σκοτεινά δασωμένα βουνά του. Μικρή χώρα, αλλά με ψηλά βουνά και υπέροχες ακτές στην Αδριατική.',
@@ -1071,7 +1059,7 @@ export const COUNTRIES = {
     capital: 'Βουκουρέστι',
     language: 'Ρουμανικά',
     currency: 'Λέου',
-    map: { x: 770, y: 160 }, // θέση στον σχηματικό χάρτη
+    lonLat: [24.9, 45.9], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['bulgaria', 'serbia', 'hungary'],
     intro:
       'Τα ρουμανικά είναι λατινογενής γλώσσα, συγγενική με τα ιταλικά! Η χώρα έχει τα βουνά Καρπάθια, πυκνά δάση και το Δέλτα του Δούναβη.',
@@ -1218,7 +1206,7 @@ export const COUNTRIES = {
     capital: 'Ζάγκρεμπ',
     language: 'Κροατικά',
     currency: 'Ευρώ (€)',
-    map: { x: 150, y: 250 }, // θέση στον σχηματικό χάρτη
+    lonLat: [16.0, 45.3], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['hungary', 'serbia', 'bosnia', 'montenegro'],
     intro:
       'Η Κροατία έχει πάνω από 1.000 νησιά και νησίδες στην Αδριατική θάλασσα και μία από τις πιο όμορφες ακτογραμμές της Ευρώπης.',
@@ -1364,7 +1352,7 @@ export const COUNTRIES = {
     capital: 'Σαράγεβο',
     language: 'Βοσνιακά, Κροατικά και Σερβικά',
     currency: 'Μετατρέψιμο μάρκο',
-    map: { x: 300, y: 330 }, // θέση στον σχηματικό χάρτη
+    lonLat: [17.8, 44.2], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['croatia', 'serbia', 'montenegro'],
     intro:
       'Μια ορεινή χώρα με δύο περιοχές: τη Βοσνία στον βορρά και την Ερζεγοβίνη στον νότο. Έχει μόνο περίπου 20 χιλιόμετρα ακτής, γύρω από την πόλη Νέουμ!',
@@ -1512,7 +1500,7 @@ export const COUNTRIES = {
     capital: 'Βουδαπέστη',
     language: 'Ουγγρικά',
     currency: 'Φιορίνι',
-    map: { x: 430, y: 80 }, // θέση στον σχηματικό χάρτη
+    lonLat: [19.4, 47.1], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['romania', 'serbia', 'croatia'],
     intro:
       'Τα ουγγρικά δεν μοιάζουν με τις γλώσσες των γειτόνων τους – συγγενεύουν μακρινά με τα φινλανδικά! Η χώρα έχει πολλές θερμές πηγές και τη μεγάλη λίμνη Μπάλατον.',
@@ -1654,8 +1642,12 @@ export const COUNTRIES = {
   },
 };
 
+// Οι υπόλοιπες χώρες της Ευρώπης βρίσκονται σε ξεχωριστά αρχεία ανά περιοχή (js/data/regions.js).
+Object.assign(COUNTRIES, REGIONS);
+
 // Συμπληρώνει ids/αναφορές ώστε το υπόλοιπο παιχνίδι να μη χρειάζεται να τα ψάχνει.
 for (const [countryId, c] of Object.entries(COUNTRIES)) {
+  c.sea = c.sea || [];
   c.id = countryId;
   c.cities.forEach((city, ci) => {
     city.countryId = countryId;
@@ -1669,6 +1661,15 @@ for (const [countryId, c] of Object.entries(COUNTRIES)) {
 }
 
 export const COUNTRY_IDS = Object.keys(COUNTRIES);
+
+/**
+ * Όλες οι «γειτονικές» χώρες: με κοινά σύνορα στη στεριά (`neighbors`)
+ * ή με σύνδεση από θάλασσα, γέφυρα ή σήραγγα (`sea`, π.χ. Ελλάδα–Κύπρος).
+ */
+export function links(countryId) {
+  const c = COUNTRIES[countryId];
+  return [...c.neighbors, ...c.sea];
+}
 
 export function getCity(cityId) {
   for (const c of Object.values(COUNTRIES)) {
@@ -1688,7 +1689,7 @@ export function countryTier(countryId) {
   const queue = [START_COUNTRY];
   while (queue.length) {
     const cur = queue.shift();
-    for (const n of COUNTRIES[cur].neighbors) {
+    for (const n of links(cur)) {
       if (dist[n] === undefined) {
         dist[n] = dist[cur] + 1;
         queue.push(n);

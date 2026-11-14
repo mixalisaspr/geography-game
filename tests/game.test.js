@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { COUNTRIES, COUNTRY_IDS, START_COUNTRY, allItems, cityDifficulty } from '../js/data/countries.js';
+import { COUNTRIES, COUNTRY_IDS, START_COUNTRY, allItems, cityDifficulty, links } from '../js/data/countries.js';
+import { mapLayout } from '../js/map-layout.js';
 import { generateTrack } from '../js/track.js';
 import { trackForCity } from '../js/levels.js';
 import { LevelSim, autopilot } from '../js/physics.js';
@@ -29,13 +30,28 @@ test('τα σύνορα είναι αμφίδρομα και δείχνουν σ
       assert.ok(COUNTRIES[n], `${id}: άγνωστος γείτονας ${n}`);
       assert.ok(COUNTRIES[n].neighbors.includes(id), `${n} δεν έχει γείτονα την ${id}`);
     }
+    for (const n of c.sea) {
+      assert.ok(COUNTRIES[n], `${id}: άγνωστη θαλάσσια σύνδεση ${n}`);
+      assert.ok(COUNTRIES[n].sea.includes(id), `${n} δεν έχει θαλάσσια σύνδεση με ${id}`);
+      assert.ok(!c.neighbors.includes(n), `${id}–${n}: και στεριά και θάλασσα`);
+    }
   }
+});
+
+test('στον χάρτη οι χώρες δεν πέφτουν η μία πάνω στην άλλη', () => {
+  const { pos } = mapLayout(COUNTRIES);
+  for (let i = 0; i < COUNTRY_IDS.length; i++)
+    for (let j = i + 1; j < COUNTRY_IDS.length; j++) {
+      const a = pos[COUNTRY_IDS[i]];
+      const b = pos[COUNTRY_IDS[j]];
+      assert.ok(Math.hypot(a.x - b.x, a.y - b.y) > 120, `${COUNTRY_IDS[i]} – ${COUNTRY_IDS[j]}`);
+    }
 });
 
 test('όλες οι χώρες είναι προσβάσιμες ξεκινώντας από την Ελλάδα', () => {
   const seen = new Set([START_COUNTRY]);
   const q = [START_COUNTRY];
-  while (q.length) for (const n of COUNTRIES[q.shift()].neighbors) if (!seen.has(n)) seen.add(n) && q.push(n);
+  while (q.length) for (const n of links(q.shift())) if (!seen.has(n)) seen.add(n) && q.push(n);
   assert.deepEqual([...seen].sort(), [...COUNTRY_IDS].sort());
 });
 
