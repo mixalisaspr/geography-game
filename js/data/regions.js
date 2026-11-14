@@ -7,5 +7,6 @@ import { WEST } from './west.js';
 import { WEST2 } from './west2.js';
 import { NORTH } from './north.js';
 import { EAST } from './east.js';
+import { ISLANDS } from './islands.js';
 
-export const REGIONS = { ...CENTRAL, ...CENTRAL2, ...WEST, ...WEST2, ...NORTH, ...EAST };
+export const REGIONS = { ...CENTRAL, ...CENTRAL2, ...WEST, ...WEST2, ...NORTH, ...EAST, ...ISLANDS };

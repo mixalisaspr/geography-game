@@ -40,7 +40,7 @@ export const COUNTRIES = {
     currency: 'Ευρώ (€)',
     lonLat: [22.5, 39.3], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['albania', 'north-macedonia', 'bulgaria', 'turkey'],
-    sea: ['italy'],
+    sea: ['italy', 'cyprus'],
     intro:
       'Η χώρα του ήλιου και της θάλασσας, με περίπου 6.000 νησιά και νησίδες! Εδώ γεννήθηκαν η δημοκρατία, το θέατρο και οι Ολυμπιακοί Αγώνες.',
     cities: [

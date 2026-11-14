@@ -81,7 +81,7 @@ export const CENTRAL = {
     currency: 'Ευρώ (€)',
     lonLat: [12.5, 42.8],
     neighbors: ['austria', 'slovenia', 'switzerland', 'france'],
-    sea: ['greece'],
+    sea: ['greece', 'malta'],
     intro: 'Η χώρα σε σχήμα μπότας! Είναι από τις χώρες με τα περισσότερα μνημεία παγκόσμιας κληρονομιάς της UNESCO, και η πατρίδα της πίτσας.',
     cities: [
       city('rome', 'Ρώμη', 'Η «Αιώνια Πόλη», πρωτεύουσα της Ιταλίας και κάποτε κέντρο της Ρωμαϊκής Αυτοκρατορίας.', [
