@@ -19,5 +19,6 @@ export function buildTrack(city) {
     water: t.water,
     obstacles: t.obstacles,
     hills: t.hills,
+    style: city.rider ? 'rider' : 'classic',
   });
 }

@@ -13,6 +13,9 @@ import {
   isCountryDone,
   nextCity,
   recordCityResult,
+  RIDER_SCORE,
+  addScore,
+  distancePoints,
   runPoints,
   totalPoints,
   totalStars,
@@ -507,6 +510,7 @@ export class UI {
         <div class="help-row"><span class="key">🚩</span><p>Στα <b>checkpoints</b> μαζεύεις αντικείμενα 🎒 και διαβάζεις πληροφορίες 📖 για τη χώρα. Αν πέσεις, συνεχίζεις από το τελευταίο checkpoint.</p></div>
         <div class="help-row"><span class="key">🎓</span><p>Στον τερματισμό σε περιμένει ένα <b>mini quiz</b> με όσα έμαθες. Κάθε σωστή απάντηση σού δίνει <b>+1 πόντο</b> 🏆.</p></div>
         <div class="help-row"><span class="key">💥</span><p>Αν πέσεις με το κεφάλι, η μηχανή <b>εκρήγνυται</b> και χάνεις <b>1 πόντο</b>! Το ίδιο αν πέσεις στο νερό.</p></div>
+        <div class="help-row"><span class="key">🔄</span><p><b>Αθήνα (νέα πίστα):</b> μεγάλα άλματα και γκρεμοί! Κερδίζεις πόντους όσο προχωράς και με <b>τούμπες</b> στον αέρα· οι πτώσεις αφαιρούν ${RIDER_SCORE.crash}, αλλά το σκορ δεν πέφτει ποτέ κάτω από 0.</p></div>
         <div class="help-row"><span class="key">🗺️</span><p>Όταν τελειώσεις όλες τις πόλεις μιας χώρας, μπορείς να πας μόνο σε μια χώρα που <b>συνορεύει</b> μαζί της.</p></div>
       </div>
       <div class="actions"><button class="btn primary" data-act="ok">Κατάλαβα!</button></div>`,
@@ -528,7 +532,8 @@ export class UI {
     this.save();
     this.showScreen(null);
     this.hud.hidden = false;
-    this.run = { city, answers: [], correct: 0, crashes: 0, items: [] };
+    // rider: νέο σύστημα πόντων (απόσταση + τούμπες + quiz − πτώσεις, ποτέ κάτω από 0)
+    this.run = { city, answers: [], correct: 0, crashes: 0, items: [], rider: !!city.rider, score: 0, dist: 0, flips: 0, lost: 0 };
     this.game.load(city, 'play');
     this.game.pause();
     $('#hud-city').textContent = `${country.flag} ${city.name}`;
@@ -542,7 +547,12 @@ export class UI {
         <p>${esc(city.intro)}</p>
         <p class="label">Θα βρεις στη διαδρομή:</p>
         <div class="to-find">${CHECKPOINTS.map((c) => `<span>${c.type === 'item' ? city.items[c.i].emoji : '📖'}</span>`).join('')}<span>🎓</span></div>
-        <p class="muted points-rule">Διάβασε προσεκτικά: στο τέλος σε περιμένει <b>mini quiz</b>! 🏆 Σωστή απάντηση: <b>+1</b> · 💥 Πτώση: <b>−1</b></p>
+        ${
+          city.rider
+            ? `<p class="muted points-rule">⚠️ <b>Δύσκολη πίστα!</b> Μεγάλα άλματα, γκρεμοί και ψηλά εμπόδια. Στον αέρα ίσιωσε τη μηχανή με το γκάζι/φρένο – ή κάνε <b>τούμπες</b> 🔄!</p>
+        <p class="muted points-rule">🏆 Κερδίζεις πόντους όσο προχωράς · 🔄 Τούμπα: <b>+${RIDER_SCORE.flip}</b> · 🎓 Σωστή απάντηση: <b>+${RIDER_SCORE.quiz}</b> · 💥 Πτώση: <b>−${RIDER_SCORE.crash}</b> (ποτέ κάτω από 0)</p>`
+            : `<p class="muted points-rule">Διάβασε προσεκτικά: στο τέλος σε περιμένει <b>mini quiz</b>! 🏆 Σωστή απάντηση: <b>+1</b> · 💥 Πτώση: <b>−1</b></p>`
+        }
       </div>
       <div class="actions"><button class="btn" data-act="map">🗺️ Χάρτης</button><button class="btn primary big" data-act="go">Πάμε! 🏍️</button></div>`,
       (ev) => {
@@ -558,7 +568,16 @@ export class UI {
   }
 
   get points() {
-    return this.run ? runPoints(this.run.correct, this.run.crashes) : 0;
+    if (!this.run) return 0;
+    return this.run.rider ? this.run.score : runPoints(this.run.correct, this.run.crashes);
+  }
+
+  /** rider: αλλάζει το σκορ (ποτέ κάτω από 0) και ενημερώνει το HUD. */
+  addRiderScore(delta, animate = true) {
+    const before = this.run.score;
+    this.run.score = addScore(before, delta);
+    if (delta < 0) this.run.lost += before - this.run.score;
+    this.updatePoints(animate ? Math.sign(delta) : 0);
   }
 
   updateBag() {
@@ -582,7 +601,8 @@ export class UI {
   onCrash() {
     if (!this.run) return;
     this.run.crashes++;
-    this.updatePoints(-1);
+    if (this.run.rider) this.addRiderScore(-RIDER_SCORE.crash);
+    else this.updatePoints(-1);
   }
 
   renderProgressMarkers() {
@@ -666,7 +686,8 @@ export class UI {
             this.run.answers.push(ok);
             if (ok) {
               this.run.correct++;
-              this.updatePoints(+1);
+              if (this.run.rider) this.addRiderScore(RIDER_SCORE.quiz);
+              else this.updatePoints(+1);
               this.sound.correct();
               setTimeout(() => this.sound.point(), 250);
             } else this.sound.wrong();
@@ -678,7 +699,7 @@ export class UI {
             const fb = $('.feedback', this.modalBox);
             fb.hidden = false;
             fb.className = `feedback ${ok ? 'ok' : 'bad'}`;
-            fb.innerHTML = `<b>${ok ? '✅ Σωστά! +1 πόντος 🏆' : `❌ Η σωστή απάντηση: ${esc(correct)}`}</b>
+            fb.innerHTML = `<b>${ok ? `✅ Σωστά! ${this.run.rider ? `+${RIDER_SCORE.quiz} πόντοι` : '+1 πόντος'} 🏆` : `❌ Η σωστή απάντηση: ${esc(correct)}`}</b>
               <p class="source"><span class="muted">Το είδες στο checkpoint ${q.checkpoint}:</span><br>${esc(q.source)}</p>`;
             $('[data-act="next"]', this.modalBox).hidden = false;
             this.modalBox.scrollTo({ top: this.modalBox.scrollHeight, behavior: 'smooth' });
@@ -697,7 +718,7 @@ export class UI {
       `<div class="results">
         <div class="confetti">🎓</div>
         <h2>Τερμάτισες! Ώρα για mini quiz!</h2>
-        <p>${questions.length} ερωτήσεις για όσα είδες στη διαδρομή. Κάθε σωστή απάντηση: <b>+1 πόντος</b> 🏆</p>
+        <p>${questions.length} ερωτήσεις για όσα είδες στη διαδρομή. Κάθε σωστή απάντηση: <b>${this.run.rider ? `+${RIDER_SCORE.quiz} πόντοι` : '+1 πόντος'}</b> 🏆</p>
       </div>
       <div class="actions"><button class="btn primary big" data-act="start">Ξεκίνα ▶</button></div>`,
       (ev) => {
@@ -737,8 +758,15 @@ export class UI {
         <div class="score-box ${points < 0 ? 'negative' : ''}">
           <div class="score">🏆 ${points} ${Math.abs(points) === 1 ? 'πόντος' : 'πόντοι'}</div>
           <div class="score-lines">
-            <span class="plus">🎓 ${plural(correct, 'σωστή απάντηση', 'σωστές απαντήσεις')}: +${correct}</span>
-            <span class="minus">💥 ${plural(crashes, 'πτώση', 'πτώσεις')}: −${crashes}</span>
+            ${
+              run.rider
+                ? `<span class="plus">🛣️ Απόσταση: +${run.dist}</span>
+            <span class="plus">🔄 ${plural(run.flips, 'τούμπα', 'τούμπες')}: +${run.flips * RIDER_SCORE.flip}</span>
+            <span class="plus">🎓 ${plural(correct, 'σωστή απάντηση', 'σωστές απαντήσεις')}: +${correct * RIDER_SCORE.quiz}</span>
+            <span class="minus">💥 ${plural(crashes, 'πτώση', 'πτώσεις')}: −${run.lost}</span>`
+                : `<span class="plus">🎓 ${plural(correct, 'σωστή απάντηση', 'σωστές απαντήσεις')}: +${correct}</span>
+            <span class="minus">💥 ${plural(crashes, 'πτώση', 'πτώσεις')}: −${crashes}</span>`
+            }
           </div>
           ${newBest && prevBest !== undefined ? '<div class="record">🎉 Νέο ρεκόρ!</div>' : prevBest !== undefined ? `<div class="muted">Ρεκόρ: ${prevBest}</div>` : ''}
         </div>
@@ -943,13 +971,27 @@ export class UI {
       this.onCheckpoint(i);
     });
     g.on('crash', () => this.onCrash());
+    g.on('flip', (n) => {
+      if (!this.run?.rider) return;
+      this.run.flips += n;
+      this.addRiderScore(n * RIDER_SCORE.flip);
+    });
     g.on('finish', (stats) => {
       this.resetInput();
       this.onFinish(stats);
     });
-    g.on('progress', (p) => {
+    g.on('progress', (p, sim) => {
       const bar = $('#hud-progress');
       if (bar) bar.style.width = `${p * 100}%`;
+      // rider: πόντοι όσο προχωράς (μόνο για καινούργια διαδρομή, όχι μετά από επαναφορά)
+      const run = this.run;
+      if (run?.rider && sim) {
+        const dp = distancePoints(sim.maxX, sim.track.startX);
+        if (dp > run.dist) {
+          this.addRiderScore(dp - run.dist, false);
+          run.dist = dp;
+        }
+      }
     });
   }
 }

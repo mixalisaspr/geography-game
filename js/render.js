@@ -870,10 +870,35 @@ function drawObstacle(ctx, o, th, t) {
       ctx.stroke();
       break;
     }
+    case 'block': {
+      // μεγάλος μαρμάρινος όγκος με ράβδωση κίονα
+      ctx.fillStyle = MARBLE;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y + 2);
+      for (const p of pts) ctx.lineTo(p.x, p.y);
+      ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y + 2);
+      ctx.fill();
+      ctx.strokeStyle = shade(MARBLE, -0.28);
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.strokeStyle = shade(MARBLE, -0.14);
+      ctx.lineWidth = 1.5;
+      const left = x - o.w / 2;
+      for (let gx = left + 14; gx < x + o.w / 2 - 8; gx += 16) {
+        ctx.beginPath();
+        ctx.moveTo(gx, y - o.h + 6);
+        ctx.lineTo(gx, y - 2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = shade(MARBLE, 0.12);
+      ctx.fillRect(left + 4, y - o.h, o.w - 10, 5);
+      break;
+    }
     case 'amphora': {
       const cy = y - o.ry;
       ctx.save();
       ctx.translate(x, cy);
+      if (o.k && o.k !== 1) ctx.scale(o.k, o.k);
       ctx.fillStyle = '#c46a3a';
       ctx.beginPath();
       ctx.ellipse(-2, 0, 18, 10, 0, 0, TAU);
@@ -1695,6 +1720,15 @@ export class Renderer {
     // νερό στα κενά (πίσω από το έδαφος)
     for (const g of track.gaps) {
       if (g.x1 < x0 || g.x0 > x1) continue;
+      if (g.pit) {
+        // γκρεμός: σκοτεινό χάσμα
+        const grd = ctx.createLinearGradient(0, g.topY, 0, g.topY + 260);
+        grd.addColorStop(0, shade(th.ground, -0.45));
+        grd.addColorStop(1, '#120d0a');
+        ctx.fillStyle = grd;
+        ctx.fillRect(g.x0, g.topY + 6, g.x1 - g.x0, yBottom - g.topY + 10);
+        continue;
+      }
       const wc = th.waterColor || '#2b8fd8';
       const grd = ctx.createLinearGradient(0, g.waterY, 0, g.waterY + 200);
       grd.addColorStop(0, shade(wc, 0.1));
@@ -1815,10 +1849,10 @@ export class Renderer {
       ctx.fillStyle = '#1f2937';
       ctx.font = '900 20px system-ui, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(j.water ? '≈' : '!', j.x, gy - 65);
+      ctx.fillText(j.water ? '≈' : j.pit ? '⇡' : '!', j.x, gy - 65);
       if (L.showTips) {
         ctx.font = 'bold 11px system-ui, sans-serif';
-        const text = 'Άσε το γκάζι στον αέρα!';
+        const text = j.pit ? 'Φουλ γκάζι – γκρεμός!' : L.rider ? 'Ίσιωσε τη μηχανή στον αέρα!' : 'Άσε το γκάζι στον αέρα!';
         const w = ctx.measureText(text).width + 12;
         ctx.fillStyle = 'rgba(255,255,255,0.95)';
         ctx.fillRect(j.x - w / 2, gy - 54, w, 18);

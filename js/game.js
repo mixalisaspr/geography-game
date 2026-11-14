@@ -4,6 +4,7 @@ import { LevelSim, autopilot } from './physics.js';
 import { Renderer } from './render.js';
 import { trackForCity } from './levels.js';
 import { COUNTRIES, cityDifficulty } from './data/countries.js';
+import { RIDER_SCORE } from './progress.js';
 
 export class Game {
   constructor(canvas, sound) {
@@ -47,6 +48,7 @@ export class Game {
       look: { helmet, jacket: '#1f3b63', bikeColor: '#f25c05' },
       checkpointLabels: [city.items[0].emoji, '📖', city.items[1].emoji, '📖'],
       showTips: cityDifficulty(city) < 0.2, // στην Ελλάδα οι πινακίδες λένε και τι να κάνεις
+      rider: track.style === 'rider',
     });
     this.renderer.snapCamera(this.sim.bike);
   }
@@ -111,8 +113,15 @@ export class Game {
         if (this.mode === 'play') this.sound.explosion();
       }
       if (this.mode === 'play') {
-        r.floatText(c.x + 50, c.y - 30, '−1', '#ff6b6b', 30);
+        r.floatText(c.x + 50, c.y - 30, sim.rider ? `−${RIDER_SCORE.crash}` : '−1', '#ff6b6b', 30);
         this.emit('crash', e.reason);
+      }
+    } else if (e.type === 'flip') {
+      if (this.mode === 'play') {
+        r.floatText(c.x, c.y - 80, e.count > 1 ? `🔄 ${e.count}× Τούμπα!` : '🔄 Τούμπα!', '#fde047', 28);
+        this.sound.tone(660, 0.1, 'square', 0.1);
+        this.sound.tone(990, 0.14, 'square', 0.1, 0.09);
+        this.emit('flip', e.count);
       }
     } else if (e.type === 'savepoint') {
       r.floatText(e.x, sim.world.groundY(e.x) - 70, '✔ Σημείο επαναφοράς', '#bbf7d0', 16);
