@@ -1214,6 +1214,7 @@ export class Renderer {
     const targetLean = sim.state === 'running' ? (input.gas ? -1 : 0) + (input.brake ? 1 : 0) : 0;
     this.lean += (targetLean - this.lean) * (1 - Math.exp(-dt * 8));
     this.shake = Math.max(0, this.shake - dt * 2);
+    this.speed = (this.speed || 0) + ((sim.state === 'running' ? v.x : 0) - (this.speed || 0)) * (1 - Math.exp(-dt * 3));
 
     // σκόνη από τον πίσω τροχό
     if (sim.state === 'running' && bike.contact[0] && input.gas && Math.random() < 0.5) {
@@ -1260,6 +1261,107 @@ export class Renderer {
       f.y -= 30 * dt;
     }
     this.floaters = this.floaters.filter((f) => f.life > 0);
+  }
+
+  /** Σύννεφο σκόνης στην προσγείωση. */
+  dust(x, y, n = 10) {
+    const th = this.level?.theme || {};
+    const color = th.surface === 'snow' ? '#ffffff' : shade(th.ground || '#9c7349', 0.3);
+    for (let i = 0; i < n; i++) {
+      const dir = i % 2 ? 1 : -1;
+      this.particles.push({
+        x: x + dir * Math.random() * 20,
+        y,
+        vx: dir * (40 + Math.random() * 120),
+        vy: -20 - Math.random() * 70,
+        life: 0.5 + Math.random() * 0.3,
+        max: 0.8,
+        size: 3 + Math.random() * 5,
+        grow: 8,
+        color,
+        g: 40,
+        drag: 2,
+      });
+    }
+  }
+
+  /** Νομίσματα (χρυσά, γυρίζουν) και διαμάντια (πάνω από τα κενά). */
+  drawPickups(sim, x0, x1) {
+    const list = sim?.pickups;
+    if (!list?.length) return;
+    const { ctx } = this;
+    let lo = 0;
+    let hi = list.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (list[mid].x < x0) lo = mid + 1;
+      else hi = mid;
+    }
+    for (let i = lo; i < list.length && list[i].x < x1; i++) {
+      if (sim.taken[i]) continue;
+      const k = list[i];
+      const bob = Math.sin(this.time * 3 + k.x * 0.05) * 3;
+      if (k.kind === 'gem') {
+        const y = k.y + bob;
+        ctx.fillStyle = 'rgba(125, 211, 252, 0.25)';
+        ctx.beginPath();
+        ctx.arc(k.x, y, 19 + Math.sin(this.time * 5 + k.x) * 2, 0, TAU);
+        ctx.fill();
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#0c4a6e';
+        ctx.fillStyle = '#38bdf8';
+        poly(ctx, [
+          [k.x - 12, y - 3],
+          [k.x - 6, y - 11],
+          [k.x + 6, y - 11],
+          [k.x + 12, y - 3],
+          [k.x, y + 13],
+        ].flat());
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#e0f2fe';
+        poly(ctx, [
+          [k.x - 6, y - 11],
+          [k.x + 6, y - 11],
+          [k.x + 3, y - 3],
+          [k.x - 3, y - 3],
+        ].flat());
+        ctx.fill();
+      } else {
+        const w = Math.abs(Math.cos(this.time * 4 + k.x * 0.02)) * 9 + 2;
+        ctx.fillStyle = '#facc15';
+        ctx.strokeStyle = '#a16207';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.ellipse(k.x, k.y + bob, w, 11, 0, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#fef08a';
+        ctx.beginPath();
+        ctx.ellipse(k.x - w * 0.25, k.y + bob - 3, w * 0.35, 4, 0, 0, TAU);
+        ctx.fill();
+      }
+    }
+  }
+
+  /** Γραμμές ταχύτητας όταν η μηχανή τρέχει πολύ. */
+  drawSpeedLines() {
+    const a = Math.max(0, Math.min(1, ((this.speed || 0) - 430) / 150));
+    if (a <= 0) return;
+    const { ctx, W, H } = this;
+    ctx.strokeStyle = `rgba(255,255,255,${0.28 * a})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < 12; i++) {
+      const h = hash1(i * 7.3 + 1);
+      const y = hash1(i * 3.1 + 5) * H * 0.9;
+      const len = 60 + h * 140;
+      const x = W + len - ((this.time * (900 + h * 900) + h * 3000) % (W + len * 2));
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + len, y);
+    }
+    ctx.stroke();
   }
 
   burst(x, y, color, n = 24, speed = 220, g = 300, emojis = null) {
@@ -1472,6 +1574,7 @@ export class Renderer {
     for (const o of L.track.obstacles) {
       if (o.x > x0 - 60 && o.x < x1 + 60) drawObstacle(ctx, o, th, this.time);
     }
+    this.drawPickups(sim, x0, x1);
     this.drawSavepoints(sim, L, x0, x1);
     this.drawCheckpoints(sim, L, x0, x1);
     this.drawFinish(sim, L);
@@ -1493,6 +1596,7 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
     ctx.restore();
+    this.drawSpeedLines();
     if (this.flash > 0) {
       ctx.fillStyle = `rgba(255, 236, 190, ${this.flash * 0.55})`;
       ctx.fillRect(0, 0, W, H);

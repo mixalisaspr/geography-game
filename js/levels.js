@@ -1,5 +1,6 @@
 import { cityDifficulty } from './data/countries.js';
 import { generateTrack } from './track.js';
+import { generatePickups } from './pickups.js';
 
 const cache = new Map();
 
@@ -13,7 +14,7 @@ export function trackForCity(city) {
 
 export function buildTrack(city) {
   const t = city.theme;
-  return generateTrack({
+  const track = generateTrack({
     seed: `geomichani:${city.id}`,
     difficulty: cityDifficulty(city),
     water: t.water,
@@ -21,4 +22,6 @@ export function buildTrack(city) {
     hills: t.hills,
     style: city.rider ? 'rider' : 'classic',
   });
+  track.pickups = generatePickups(track, `geomichani:${city.id}`);
+  return track;
 }

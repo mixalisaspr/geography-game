@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { COUNTRIES, COUNTRY_IDS, START_COUNTRY, allItems, cityDifficulty, links } from '../js/data/countries.js';
 import { mapLayout } from '../js/map-layout.js';
 import { generateTrack } from '../js/track.js';
+import { generatePickups } from '../js/pickups.js';
 import { buildTrack, trackForCity } from '../js/levels.js';
 import { LevelSim, RIDER_HANDLING, CFG } from '../js/physics.js';
 import { LANDMARKS } from '../js/render.js';
@@ -20,6 +21,7 @@ import {
   recordCityResult,
   runPoints,
   totalPoints,
+  trickPoints,
 } from '../js/progress.js';
 
 const OBSTACLES = ['column', 'amphora', 'rock', 'crate', 'barrel', 'hay', 'log'];
@@ -355,4 +357,62 @@ test('μια πλήρης τούμπα στον αέρα μετράει όταν
   }
   assert.equal(flips, 1);
   assert.equal(sim.flips, 1);
+});
+
+test('νομίσματα και διαμάντια: ντετερμινιστικά, ένα διαμάντι τουλάχιστον σε κάθε κενό, μαζεύονται μία φορά', () => {
+  const city = COUNTRIES.greece.cities[0];
+  const t = trackForCity(city);
+  const again = generatePickups(t, `geomichani:${city.id}`);
+  assert.deepEqual(again, t.pickups);
+  const gems = t.pickups.filter((p) => p.kind === 'gem');
+  const coins = t.pickups.filter((p) => p.kind === 'coin');
+  assert.ok(coins.length >= 200, `μόνο ${coins.length} νομίσματα`);
+  for (const g of t.gaps) assert.ok(gems.some((p) => p.x > g.x0 && p.x < g.x1), 'κενό χωρίς διαμάντι');
+  // τα νομίσματα δεν κρέμονται πάνω από κενά και είναι ταξινομημένα
+  for (const c of coins) assert.ok(!t.gaps.some((g) => c.x > g.x0 && c.x < g.x1));
+  for (let i = 1; i < t.pickups.length; i++) assert.ok(t.pickups[i].x >= t.pickups[i - 1].x);
+
+  const sim = new LevelSim(t);
+  let got = 0;
+  for (let i = 0; i < 900; i++) got += sim.update(1 / 60, { gas: true, brake: false }).filter((e) => e.type === 'pickup').length;
+  assert.ok(got > 0 && got === sim.coins + sim.gems);
+  // μετά από επαναφορά δεν ξαναμαζεύονται
+  const far = sim.bike.center.x;
+  sim.respawn(sim.track.startX);
+  let again2 = 0;
+  for (let i = 0; i < 900 && sim.bike.center.x < far - 100; i++)
+    again2 += sim.update(1 / 60, { gas: true, brake: false }).filter((e) => e.type === 'pickup').length;
+  assert.equal(again2, 0);
+});
+
+test('σερί: κάθε κόλπο ανεβάζει τον πολλαπλασιαστή έως x5 και η πτώση τον μηδενίζει', () => {
+  const t = generateTrack({ seed: 'flat', difficulty: 0, water: null, obstacles: ['rock'], style: 'rider' });
+  const sim = new LevelSim(t);
+  const mults = [];
+  for (let i = 0; i < 7; i++) {
+    const ev = [];
+    sim.award(ev, { type: 'perfect' });
+    mults.push(ev[0].mult);
+  }
+  assert.deepEqual(mults, [1, 2, 3, 4, 5, 5, 5]);
+  assert.equal(sim.bestCombo, 5);
+  assert.equal(trickPoints(RIDER_SCORE.flip, 3, 2), RIDER_SCORE.flip * 6);
+  // πτώση με το κεφάλι: γυρίζουμε τη μηχανή ανάποδα πάνω στο έδαφος
+  sim.bike.place(300, sim.world.groundY(300) - 40, Math.PI);
+  for (let i = 0; i < 240 && sim.state === 'running'; i++) sim.update(1 / 120, { gas: false, brake: false });
+  assert.equal(sim.state, 'crashed');
+  assert.equal(sim.mult, 1);
+  assert.equal(sim.combo, 0);
+});
+
+test('τέλεια προσγείωση: ίσια προσγείωση μετά από μεγάλο άλμα δίνει κόλπο', () => {
+  const t = generateTrack({ seed: 'flat', difficulty: 0, water: null, obstacles: ['rock'], style: 'rider' });
+  const sim = new LevelSim(t);
+  sim.bike.place(100, sim.world.groundY(100) - 400, 0);
+  const types = [];
+  for (let i = 0; i < 480 && !types.includes('perfect') && sim.state === 'running'; i++)
+    for (const e of sim.update(1 / 120, { gas: false, brake: false })) types.push(e.type);
+  assert.ok(types.includes('land'));
+  assert.ok(types.includes('perfect'));
+  assert.equal(sim.perfects, 1);
 });

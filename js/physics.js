@@ -27,6 +27,10 @@ export const CFG = {
 // και πιάνει μεγαλύτερη ταχύτητα (~600 αντί για ~460 μονάδες/s)
 export const RIDER_HANDLING = { leanAir: 34, maxAngVel: 15, airDamp: 7, maxSpin: 43, motorAcc: 180 };
 
+export const PICKUP_R = 34; // απόσταση (από τροχό ή κεφάλι) για να μαζέψεις νόμισμα/διαμάντι
+export const PERFECT = { minAir: 0.7, maxAngle: 0.2 }; // «τέλεια προσγείωση»: μεγάλο άλμα, ρόδες παράλληλα στο έδαφος
+export const MAX_COMBO = 5;
+
 // Τοπικές θέσεις των σημείων (κέντρο ανάμεσα στους τροχούς, y προς τα κάτω)
 const LOCAL = [
   { x: -CFG.wheelBase / 2, y: 0 },
@@ -418,7 +422,17 @@ export class LevelSim {
     this.airRot = 0; // περιστροφή στον αέρα (για τούμπες)
     this.prevAngle = 0;
     this.pendingFlips = 0;
+    this.pendingPerfect = false;
+    this.wasAir = false;
     this.landTimer = 0;
+    this.combo = 0; // κόλπα στη σειρά χωρίς πτώση → πολλαπλασιαστής
+    this.bestCombo = 0;
+    this.perfects = 0;
+    this.pickups = track.pickups || [];
+    this.taken = new Uint8Array(this.pickups.length);
+    this.pkIdx = 0;
+    this.coins = 0;
+    this.gems = 0;
     this.reached = -1; // τελευταίο checkpoint που περάσαμε
     this.savedX = track.startX; // τελευταίο σημείο επαναφοράς (checkpoint ή σημαιάκι)
     this.nextSave = 0;
@@ -437,10 +451,50 @@ export class LevelSim {
     this.airRot = 0;
     this.prevAngle = 0;
     this.pendingFlips = 0;
+    this.pendingPerfect = false;
+    this.wasAir = false;
+    this.pkIdx = 0;
     this.state = 'running';
   }
 
-  /** Μετράει τις πλήρεις τούμπες στον αέρα· μετράνε μόνο αν προσγειωθείς χωρίς να πέσεις. */
+  /** Πολλαπλασιαστής πόντων για κόλπα: x1, x2 … x5 όσο δεν πέφτεις. */
+  get mult() {
+    return Math.max(1, Math.min(MAX_COMBO, this.combo));
+  }
+
+  award(events, e, tricks = 1) {
+    this.combo += tricks;
+    this.bestCombo = Math.max(this.bestCombo, this.mult);
+    events.push({ ...e, mult: this.mult });
+  }
+
+  collectPickups(events) {
+    const list = this.pickups;
+    if (!list.length) return;
+    const P = this.bike.p;
+    const cx = this.bike.center.x;
+    while (this.pkIdx < list.length && list[this.pkIdx].x < cx - 90) this.pkIdx++;
+    for (let i = this.pkIdx; i < list.length && list[i].x < cx + 90; i++) {
+      if (this.taken[i]) continue;
+      const k = list[i];
+      for (const p of P) {
+        const dx = p.x - k.x;
+        const dy = p.y - k.y;
+        if (dx * dx + dy * dy < PICKUP_R * PICKUP_R) {
+          this.taken[i] = 1;
+          if (k.kind === 'gem') this.gems++;
+          else this.coins++;
+          events.push({ type: 'pickup', kind: k.kind, x: k.x, y: k.y, index: i });
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Κόλπα: πλήρεις τούμπες στον αέρα και «τέλειες προσγειώσεις».
+   * Μετράνε μόνο αν προσγειωθείς χωρίς να πέσεις· κάθε κόλπο ανεβάζει τον πολλαπλασιαστή.
+   */
   trackFlips(events) {
     const bike = this.bike;
     const a = bike.angle;
@@ -449,22 +503,42 @@ export class LevelSim {
     if (!bike.grounded) {
       this.airRot += da;
       this.landTimer = 0;
+      this.wasAir = true;
       return;
     }
-    if (this.airRot !== 0) {
+    if (this.wasAir) {
+      this.wasAir = false;
+      const air = bike.lastAirTime;
       const n = Math.floor((Math.abs(this.airRot) + 0.6) / (2 * Math.PI));
       if (n > 0) {
         this.pendingFlips += n;
+        this.pendingDir = this.airRot < 0 ? 'back' : 'front';
         this.landTimer = 0.5;
+      }
+      if (air >= 0.35) {
+        const c = bike.contact[0] || bike.contact[1];
+        const rel = wrapAngle(a - Math.atan2(c.x, -c.y));
+        if (air >= PERFECT.minAir && Math.abs(rel) < PERFECT.maxAngle) {
+          this.pendingPerfect = true;
+          this.landTimer = 0.5;
+        }
+        events.push({ type: 'land', air });
       }
       this.airRot = 0;
     }
-    if (this.pendingFlips > 0) {
+    if (this.pendingFlips > 0 || this.pendingPerfect) {
       this.landTimer -= CFG.dt;
       if (this.landTimer <= 0) {
-        this.flips += this.pendingFlips;
-        events.push({ type: 'flip', count: this.pendingFlips });
-        this.pendingFlips = 0;
+        if (this.pendingFlips > 0) {
+          this.flips += this.pendingFlips;
+          this.award(events, { type: 'flip', count: this.pendingFlips, dir: this.pendingDir }, this.pendingFlips);
+          this.pendingFlips = 0;
+        }
+        if (this.pendingPerfect) {
+          this.perfects++;
+          this.award(events, { type: 'perfect' });
+          this.pendingPerfect = false;
+        }
       }
     }
   }
@@ -523,12 +597,14 @@ export class LevelSim {
         this.crashReason = reason;
         this.crashTimer = reason === 'water' ? 1.4 : 1.8;
         this.crashes++;
+        this.combo = 0;
         events.push({ type: 'crash', reason });
         return;
       }
       const cx = bike.center.x;
       if (cx > this.maxX) this.maxX = Math.min(cx, this.track.finishX);
       this.trackFlips(events);
+      this.collectPickups(events);
       // τα σημαιάκια είναι ταξινομημένα: ελέγχουμε μόνο το επόμενο
       const saves = this.track.savepoints || [];
       while (this.nextSave < saves.length && saves[this.nextSave] <= this.savedX) this.nextSave++;
