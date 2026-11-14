@@ -10,7 +10,8 @@ export const WEST = {
     language: 'Γαλλικά',
     currency: 'Ευρώ (€)',
     lonLat: [2.5, 46.6],
-    neighbors: ['belgium', 'luxembourg', 'germany', 'switzerland', 'italy'],
+    neighbors: ['belgium', 'luxembourg', 'germany', 'switzerland', 'italy', 'spain'],
+    sea: ['uk'],
     intro: 'Η χώρα με τους περισσότερους τουρίστες στον κόσμο! Έχει πάνω από 1.000 είδη τυριών, τις Άλπεις, παραλίες και τον ποταμό Σηκουάνα.',
     cities: [
       city('paris', 'Παρίσι', 'Η πρωτεύουσα της Γαλλίας, η «Πόλη του Φωτός», πάνω στον ποταμό Σηκουάνα.', [
