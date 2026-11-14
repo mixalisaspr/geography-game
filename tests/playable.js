@@ -53,7 +53,7 @@ export function playableShard(shard, shards = 4) {
   const cities = Object.values(COUNTRIES)
     .flatMap((c) => c.cities)
     .filter((_, i) => i % shards === shard);
-  test(`ένας παίκτης που αφήνει το γκάζι τερματίζει κάθε πίστα (μέρος ${shard + 1}/${shards})`, () => {
+  test(`ένας ικανός παίκτης (ισιώνει στον αέρα, αντιδρά με 0,15 s καθυστέρηση) τερματίζει κάθε πίστα (μέρος ${shard + 1}/${shards})`, () => {
     for (const city of cities) {
       const sim = new LevelSim(trackForCity(city));
       const ctl = city.rider ? skilledRider(sim.world) : human();

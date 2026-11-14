@@ -871,6 +871,40 @@ function drawObstacle(ctx, o, th, t) {
       break;
     }
     case 'block': {
+      const left = x - o.w / 2;
+      if (o.material === 'stone') {
+        // πέτρινος όγκος από λαξευτές πέτρες
+        const STONE = '#a8a39a';
+        ctx.fillStyle = STONE;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y + 2);
+        for (const p of pts) ctx.lineTo(p.x, p.y);
+        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y + 2);
+        ctx.fill();
+        ctx.strokeStyle = shade(STONE, -0.3);
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.lineWidth = 1.5;
+        const rows = Math.max(2, Math.round(o.h / 16));
+        for (let r = 1; r < rows; r++) {
+          const ry = y - (o.h * r) / rows;
+          ctx.beginPath();
+          ctx.moveTo(left + 2, ry);
+          ctx.lineTo(x + o.w / 2 - 4, ry);
+          ctx.stroke();
+        }
+        for (let r = 0; r < rows; r++) {
+          const y0 = y - (o.h * r) / rows;
+          const y1 = y - (o.h * (r + 1)) / rows;
+          for (let gx = left + (r % 2 ? 18 : 34); gx < x + o.w / 2 - 10; gx += 32) {
+            ctx.beginPath();
+            ctx.moveTo(gx, y0);
+            ctx.lineTo(gx, y1);
+            ctx.stroke();
+          }
+        }
+        break;
+      }
       // μεγάλος μαρμάρινος όγκος με ράβδωση κίονα
       ctx.fillStyle = MARBLE;
       ctx.beginPath();
@@ -883,7 +917,6 @@ function drawObstacle(ctx, o, th, t) {
       ctx.stroke();
       ctx.strokeStyle = shade(MARBLE, -0.14);
       ctx.lineWidth = 1.5;
-      const left = x - o.w / 2;
       for (let gx = left + 14; gx < x + o.w / 2 - 8; gx += 16) {
         ctx.beginPath();
         ctx.moveTo(gx, y - o.h + 6);
@@ -1852,7 +1885,13 @@ export class Renderer {
       ctx.fillText(j.water ? '≈' : j.pit ? '⇡' : '!', j.x, gy - 65);
       if (L.showTips) {
         ctx.font = 'bold 11px system-ui, sans-serif';
-        const text = j.pit ? 'Φουλ γκάζι – γκρεμός!' : L.rider ? 'Ίσιωσε τη μηχανή στον αέρα!' : 'Άσε το γκάζι στον αέρα!';
+        const text = !L.rider
+          ? 'Άσε το γκάζι στον αέρα!'
+          : j.pit
+            ? 'Φουλ γκάζι – γκρεμός!'
+            : j.water
+              ? 'Φουλ γκάζι – νερό!'
+              : 'Ίσιωσε τη μηχανή στον αέρα!';
         const w = ctx.measureText(text).width + 12;
         ctx.fillStyle = 'rgba(255,255,255,0.95)';
         ctx.fillRect(j.x - w / 2, gy - 54, w, 18);
