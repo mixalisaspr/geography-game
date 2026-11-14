@@ -114,6 +114,9 @@ export class Game {
         r.floatText(c.x + 50, c.y - 30, '−1', '#ff6b6b', 30);
         this.emit('crash', e.reason);
       }
+    } else if (e.type === 'savepoint') {
+      r.floatText(e.x, sim.world.groundY(e.x) - 70, '✔ Σημείο επαναφοράς', '#bbf7d0', 16);
+      if (this.mode === 'play') this.sound.tone(990, 0.12, 'sine', 0.12);
     } else if (e.type === 'respawn') {
       r.floatText(c.x, c.y - 60, 'Ξανά!', '#ffffff');
     } else if (e.type === 'checkpoint') {

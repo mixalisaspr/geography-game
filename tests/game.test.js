@@ -91,7 +91,8 @@ test('η πίστα είναι ντετερμινιστική, μεγάλη, κ�
     const b = trackForCity(city);
     assert.deepEqual(a.points, b.points, `${city.id}: μη ντετερμινιστική`);
     assert.equal(a.checkpoints.length, 4);
-    assert.ok(a.finishX - a.startX >= 6500, `${city.id}: πολύ μικρή πίστα (${Math.round(a.finishX)})`);
+    assert.ok(a.finishX - a.startX >= 24000, `${city.id}: πολύ μικρή πίστα (${Math.round(a.finishX)})`);
+    assert.ok(a.obstacles.length >= 25, `${city.id}: λίγα εμπόδια (${a.obstacles.length})`);
     let prev = a.startX;
     for (const cp of a.checkpoints) {
       assert.ok(cp > prev, `${city.id}: checkpoints εκτός σειράς`);
@@ -112,7 +113,7 @@ test('κάθε πίστα τερματίζεται από τον αυτόματ�
   for (const city of allCities()) {
     const sim = new LevelSim(trackForCity(city));
     let t = 0;
-    while (t < 240 && sim.state !== 'finished') {
+    while (t < 600 && sim.state !== 'finished') {
       sim.update(1 / 60, autopilot(sim.bike));
       t += 1 / 60;
     }
@@ -144,7 +145,7 @@ test('ένας παίκτης που αφήνει το γκάζι (με καθυ
   for (const city of allCities()) {
     const sim = new LevelSim(trackForCity(city));
     const ctl = human();
-    for (let t = 0; t < 300 && sim.state !== 'finished'; t += 1 / 60) sim.update(1 / 60, ctl(sim.bike));
+    for (let t = 0; t < 600 && sim.state !== 'finished'; t += 1 / 60) sim.update(1 / 60, ctl(sim.bike));
     assert.equal(sim.state, 'finished', city.id);
     assert.ok(sim.crashes <= 3, `${city.id}: ${sim.crashes} πτώσεις`);
   }
@@ -159,6 +160,27 @@ test('το mini quiz έχει μία ερώτηση για κάθε checkpoint, 
       assert.ok(q.source.length > 20, `${city.id}: λείπει η πηγή της ερώτησης`);
     });
   }
+});
+
+test('ανάμεσα στα checkpoints υπάρχουν σημεία επαναφοράς, ώστε μια πτώση να μη σε γυρνάει πολύ πίσω', () => {
+  for (const city of allCities()) {
+    const t = trackForCity(city);
+    const stops = [t.startX, ...t.checkpoints, ...t.savepoints, t.finishX].sort((a, b) => a - b);
+    for (let i = 1; i < stops.length; i++) {
+      assert.ok(stops[i] - stops[i - 1] < 3600, `${city.id}: ${Math.round(stops[i] - stops[i - 1])} μονάδες χωρίς σημείο επαναφοράς`);
+    }
+  }
+});
+
+test('μετά από πτώση ξαναξεκινάς από το τελευταίο σημείο επαναφοράς', () => {
+  const t = trackForCity(COUNTRIES.greece.cities[0]);
+  const sim = new LevelSim(t);
+  const sp = t.savepoints.find((x) => x > t.checkpoints[0]);
+  sim.reached = 0;
+  sim.bike.place(sp + 5, sim.world.groundY(sp + 5));
+  sim.update(1 / 60, { gas: false, brake: false });
+  assert.equal(sim.savedX, sp);
+  assert.equal(sim.respawnX(), sp);
 });
 
 test('κάθε άλμα έχει πινακίδα προειδοποίησης πριν από τη ράμπα', () => {

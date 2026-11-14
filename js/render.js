@@ -1289,6 +1289,7 @@ export class Renderer {
     for (const o of L.track.obstacles) {
       if (o.x > x0 - 60 && o.x < x1 + 60) drawObstacle(ctx, o, th, this.time);
     }
+    this.drawSavepoints(sim, L, x0, x1);
     this.drawCheckpoints(sim, L, x0, x1);
     this.drawFinish(sim, L);
     // μετά από έκρηξη η μηχανή «εξαφανίζεται» μέχρι να ξαναβγεί στο checkpoint
@@ -1699,6 +1700,28 @@ export class Renderer {
         ctx.fillStyle = '#b91c1c';
         ctx.fillText(text, j.x, gy - 41);
       }
+    }
+  }
+
+  /** Μικρά σημαιάκια επαναφοράς: αν πέσεις, ξαναξεκινάς από εδώ. */
+  drawSavepoints(sim, L, x0, x1) {
+    const { ctx } = this;
+    for (const sp of L.track.savepoints || []) {
+      if (sp < x0 - 40 || sp > x1 + 40) continue;
+      const gy = sim.world.groundY(sp);
+      const passed = sim.savedX >= sp;
+      ctx.fillStyle = '#d1d5db';
+      ctx.fillRect(sp - 1.5, gy - 48, 3, 48);
+      ctx.fillStyle = passed ? '#22c55e' : '#ffffff';
+      ctx.strokeStyle = passed ? '#15803d' : '#9ca3af';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(sp + 1.5, gy - 48);
+      ctx.lineTo(sp + 22, gy - 41 + Math.sin(this.time * 6 + sp) * 1.5);
+      ctx.lineTo(sp + 1.5, gy - 34);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
     }
   }
 

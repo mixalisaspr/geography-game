@@ -42,6 +42,9 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   const gaps = [];
   const checkpoints = [];
   const jumps = [];
+  const savepoints = [];
+  const SAVE_EVERY = 1200; // σημεία επαναφοράς (χωρίς popup) ανάμεσα στα checkpoints
+  let lastSave = 0;
   let x = -600;
   let y = 0;
 
@@ -60,6 +63,14 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     }
   };
   const flat = (len) => curve(len, () => 0);
+  // σημαιάκι επαναφοράς, αν έχουμε προχωρήσει αρκετά από το προηγούμενο
+  const maybeSave = () => {
+    if (x - lastSave <= SAVE_EVERY) return;
+    flat(80);
+    savepoints.push(x);
+    lastSave = x;
+    flat(80);
+  };
 
   const features = {
     rolling() {
@@ -85,8 +96,8 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     },
     bumps() {
       const n = 3 + Math.floor(rnd() * (3 + 3 * d));
-      const wl = R(70, 100);
-      const a = R(8, 15) * (0.7 + 0.6 * d);
+      const wl = R(95, 130);
+      const a = R(6, 11) * (0.7 + 0.5 * d); // ομαλά, ώστε ο τροχός να μη «σφηνώνει» στις γούβες
       curve(n * wl, (t) => -a * (1 - Math.cos(2 * Math.PI * n * t)) * 0.5);
     },
     kicker() {
@@ -120,14 +131,34 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
       }
     },
     obstacle() {
-      const count = d > 0.35 && rnd() < 0.5 ? 2 : 1;
+      // σειρά από εμπόδια (2–5, περισσότερα στις δύσκολες πόλεις)
+      const count = 2 + Math.floor(rnd() * (2 + 2 * d));
       flat(90);
       for (let i = 0; i < count; i++) {
-        const type = pick(obstacles);
+        // το κιβώτιο είναι μικρή ράμπα: μόνο πρώτο στη σειρά, ώστε να μην προσγειώνεσαι πάνω του
+        let type = pick(obstacles);
+        if (type === 'crate' && i > 0) type = obstacles.find((t) => t !== 'crate') || 'rock';
         const ox = x + 40;
-        flat(200);
+        flat(type === 'crate' ? R(300, 360) : R(230, 300));
         obs.push(makeObstacle(type, ox, y, rnd));
+        maybeSave();
       }
+    },
+    hillObstacles() {
+      // λόφος με εμπόδια στην κορυφή και στους πρόποδες
+      flat(80);
+      obs.push(makeObstacle(pick(obstacles), x + 40, y, rnd));
+      flat(200);
+      const h = R(40, 80) * amp;
+      maybeSave();
+      curve(260, (t) => -h * (1 - Math.cos(Math.PI * t)) * 0.5);
+      flat(60);
+      obs.push(makeObstacle(pick(obstacles), x + 40, y, rnd));
+      flat(200);
+      curve(260, (t) => h * (1 - Math.cos(Math.PI * t)) * 0.5);
+      flat(60);
+      obs.push(makeObstacle(pick(obstacles), x + 40, y, rnd));
+      flat(200);
     },
   };
 
@@ -137,7 +168,8 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     ['valley', 1.4],
     ['bumps', 1 + d],
     ['kicker', 1.2 + d],
-    ['obstacle', 2.6],
+    ['obstacle', 5.5],
+    ['hillObstacles', 1.5 + d],
   ];
   const totalW = weights.reduce((s, w) => s + w[1], 0);
   let last = '';
@@ -160,23 +192,26 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   flat(800); // x = 200
   const startX = 0;
 
-  // μεγάλες πίστες: ~6.500–11.500 μονάδες (περίπου 30–50 δευτερόλεπτα οδήγησης)
-  const length = 6500 + 5000 * d;
+  // ΜΕΓΑΛΕΣ πίστες: ~24.000–40.000 μονάδες (περίπου 1,5–3 λεπτά οδήγησης)
+  const length = 24000 + 16000 * d;
   const parts = checkpointCount + 1;
   const chunk = length / parts;
+  lastSave = x;
   for (let k = 0; k < parts; k++) {
     const end = x + chunk;
-    let guaranteedJump = (k === 1 || k === 3) && water; // σε παραθαλάσσιες πόλεις υπάρχει σίγουρα ένα άλμα πάνω από νερό
+    let guaranteedJump = !!water; // σε κάθε κομμάτι πόλης με νερό υπάρχει σίγουρα ένα άλμα πάνω από νερό
     while (x < end) {
       let f = pickFeature();
-      if (guaranteedJump) {
+      if (guaranteedJump && x > end - chunk / 2) {
         f = 'kicker';
         guaranteedJump = false;
       }
       last = f;
       features[f]();
       flat(R(50, 110));
+      maybeSave();
     }
+    lastSave = x;
     if (k < parts - 1) {
       // ίσιωμα με checkpoint στη μέση
       const cx = x + 140;
@@ -188,7 +223,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   const finishX = x;
   // οι πινακίδες να μη «πέφτουν» πάνω στις σημαίες των checkpoints
   for (const j of jumps) {
-    for (const cp of checkpoints) {
+    for (const cp of [...checkpoints, ...savepoints]) {
       if (Math.abs(j.x - cp) < 90) j.x = cp + 90 < j.rampX - 30 ? cp + 90 : cp - 90;
     }
   }
@@ -200,11 +235,12 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     gaps,
     checkpoints,
     jumps,
+    savepoints,
     startX,
     finishX,
     endX: x,
-    minY: Math.min(...points.map((p) => p.y)),
-    maxY: Math.max(...points.filter((p) => !gaps.some((g) => p.x > g.x0 && p.x < g.x1)).map((p) => p.y)),
+    minY: points.reduce((m, p) => Math.min(m, p.y), Infinity),
+    maxY: points.reduce((m, p) => (gaps.some((g) => p.x > g.x0 && p.x < g.x1) ? m : Math.max(m, p.y)), -Infinity),
   };
 }
 
