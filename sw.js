@@ -1,5 +1,5 @@
 // Service worker: κρατά όλα τα αρχεία του παιχνιδιού για να παίζεται offline.
-const VERSION = 'geomichani-v4';
+const VERSION = 'geomichani-v6';
 const FILES = [
   './',
   './index.html',
@@ -14,7 +14,17 @@ const FILES = [
   './js/levels.js',
   './js/progress.js',
   './js/audio.js',
+  './js/map-layout.js',
   './js/data/countries.js',
+  './js/data/helpers.js',
+  './js/data/regions.js',
+  './js/data/central.js',
+  './js/data/central2.js',
+  './js/data/west.js',
+  './js/data/west2.js',
+  './js/data/north.js',
+  './js/data/east.js',
+  './js/data/islands.js',
   './icons/icon.svg',
   './icons/icon-180.png',
   './icons/icon-192.png',

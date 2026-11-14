@@ -2,6 +2,7 @@
 // Εδώ βρίσκεται και η «ροή» του παιχνιδιού (τι ανοίγει μετά από τι).
 
 import { COUNTRIES, COUNTRY_IDS, START_COUNTRY, allItems, getCity } from './data/countries.js';
+import { SEAS, fitBox, mapLayout, project } from './map-layout.js';
 import {
   availableCountries,
   canPlayCountry,
@@ -167,12 +168,13 @@ export class UI {
     this.showScreen('map');
     const data = this.data;
     const avail = availableCountries(data);
-    const pos = Object.fromEntries(COUNTRY_IDS.map((id) => [id, COUNTRIES[id].map]));
-    // ακμές (σύνορα)
+    const { pos, bounds } = mapLayout(COUNTRIES);
+    // ακμές: σύνορα στη στεριά και συνδέσεις από θάλασσα (πλοίο, γέφυρα, σήραγγα)
     let edges = '';
     const seen = new Set();
     for (const a of COUNTRY_IDS)
-      for (const b of COUNTRIES[a].neighbors) {
+      for (const b of [...COUNTRIES[a].neighbors, ...COUNTRIES[a].sea]) {
+        const bySea = COUNTRIES[a].sea.includes(b);
         const key = [a, b].sort().join('|');
         if (seen.has(key)) continue;
         seen.add(key);
@@ -183,7 +185,8 @@ export class UI {
         else if ((sa === 'done' && sb === 'available') || (sb === 'done' && sa === 'available')) cls = 'open';
         const A = pos[a];
         const B = pos[b];
-        edges += `<line class="edge ${cls}" x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}"/>`;
+        edges += `<line class="edge ${cls} ${bySea ? 'sea-link' : ''}" x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}"/>`;
+        if (bySea) edges += `<text class="ferry" x="${(A.x + B.x) / 2}" y="${(A.y + B.y) / 2 + 10}">⛴️</text>`;
       }
     let nodes = '';
     for (const id of COUNTRY_IDS) {
@@ -226,32 +229,42 @@ export class UI {
         <button class="btn" data-act="collection">🎒 ${got}/${items.length}</button>
       </header>
       <div class="map-wrap">
-        <svg class="map" viewBox="0 0 1200 710" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            <radialGradient id="sea" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#bfe3f7"/><stop offset="1" stop-color="#9fd2ef"/></radialGradient>
-          </defs>
-          <ellipse class="sea" cx="770" cy="700" rx="200" ry="120"/>
-          <ellipse class="sea" cx="330" cy="720" rx="140" ry="110"/>
-          <ellipse class="sea" cx="150" cy="470" rx="90" ry="210" transform="rotate(-35 150 470)"/>
-          <ellipse class="sea" cx="1010" cy="310" rx="150" ry="120"/>
-          <text class="sea-label" x="820" y="660">Αιγαίο</text>
-          <text class="sea-label" x="300" y="680">Ιόνιο</text>
-          <text class="sea-label" x="150" y="480" transform="rotate(55 150 480)">Αδριατική</text>
-          <text class="sea-label" x="1010" y="300">Μαύρη Θάλασσα</text>
+        <svg class="map" preserveAspectRatio="xMidYMid meet">
+          <rect class="map-bg" x="${bounds.x - 2000}" y="${bounds.y - 2000}" width="${bounds.w + 4000}" height="${bounds.h + 4000}"/>
+          ${SEAS.map(([name, ll]) => {
+            const p = project(ll);
+            return `<text class="sea-label" x="${p.x}" y="${p.y}">${name}</text>`;
+          }).join('')}
+          ${COUNTRY_IDS.map((id) => `<circle class="land" cx="${pos[id].x}" cy="${pos[id].y}" r="125"/>`).join('')}
           ${edges}
           ${nodes}
         </svg>
+        <div class="map-zoom">
+          <button class="btn icon" data-act="zoom-in" aria-label="Μεγέθυνση">＋</button>
+          <button class="btn icon" data-act="zoom-out" aria-label="Σμίκρυνση">－</button>
+          <button class="btn icon" data-act="zoom-all" aria-label="Όλη η Ευρώπη">🌍</button>
+        </div>
       </div>`;
+    // αρχικό ζουμ: οι χώρες που έχεις τελειώσει / μπορείς να παίξεις
+    const svg = $('.map', el);
+    const interesting = COUNTRY_IDS.filter((id) => countryState(data, id) !== 'locked' || id === focusId);
+    const aspect = Math.max(0.6, svg.clientWidth / Math.max(1, svg.clientHeight));
+    this.mapView = fitBox(pos, interesting, 1600, aspect);
+    this.mapBounds = bounds;
+    const dragged = this.enableMapPanZoom(svg);
     el.onclick = (ev) => {
       const act = ev.target.closest('[data-act]')?.dataset.act;
       if (act) {
         this.sound.click();
         if (act === 'home') this.showHome();
         if (act === 'collection') this.showCollection();
+        if (act === 'zoom-in') this.zoomMap(svg, 0.7);
+        if (act === 'zoom-out') this.zoomMap(svg, 1.4);
+        if (act === 'zoom-all') this.setMapView(svg, fitBox(pos, COUNTRY_IDS, 1600, aspect));
         return;
       }
       const node = ev.target.closest('.node');
-      if (node) {
+      if (node && !dragged()) {
         this.sound.click();
         this.openCountry(node.dataset.id);
       }
@@ -264,12 +277,95 @@ export class UI {
     };
   }
 
+  setMapView(svg, v) {
+    const b = this.mapBounds;
+    const w = Math.min(Math.max(v.w, 500), Math.max(b.w, b.h * (v.w / v.h)) * 1.3);
+    const h = (w / v.w) * v.h;
+    const x = Math.min(Math.max(v.x, b.x - w * 0.3), b.x + b.w - w * 0.7);
+    const y = Math.min(Math.max(v.y, b.y - h * 0.3), b.y + b.h - h * 0.7);
+    this.mapView = { x, y, w, h };
+    svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
+  }
+
+  zoomMap(svg, f, cx, cy) {
+    const v = this.mapView;
+    const px = cx ?? v.x + v.w / 2;
+    const py = cy ?? v.y + v.h / 2;
+    this.setMapView(svg, { x: px - (px - v.x) * f, y: py - (py - v.y) * f, w: v.w * f, h: v.h * f });
+  }
+
+  /** Μετακίνηση με σύρσιμο, ζουμ με δύο δάχτυλα ή ροδέλα. Επιστρέφει συνάρτηση «έγινε σύρσιμο;». */
+  enableMapPanZoom(svg) {
+    this.setMapView(svg, this.mapView);
+    const pts = new Map();
+    let moved = 0;
+    let pinch = null;
+    const scale = () => this.mapView.w / svg.clientWidth;
+    const toMap = (e) => {
+      const r = svg.getBoundingClientRect();
+      const v = this.mapView;
+      // το SVG κρατά την αναλογία του: υπολογίζουμε με την πραγματική κλίμακα
+      const k = Math.max(v.w / r.width, v.h / r.height);
+      return { x: v.x + v.w / 2 + (e.clientX - r.left - r.width / 2) * k, y: v.y + v.h / 2 + (e.clientY - r.top - r.height / 2) * k };
+    };
+    svg.addEventListener('pointerdown', (e) => {
+      pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pts.size === 1) moved = 0;
+      if (pts.size === 2) {
+        const [a, b] = [...pts.values()];
+        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), w: this.mapView.w };
+      }
+    });
+    svg.addEventListener('pointermove', (e) => {
+      const prev = pts.get(e.pointerId);
+      if (!prev) return;
+      const cur = { x: e.clientX, y: e.clientY };
+      pts.set(e.pointerId, cur);
+      if (pts.size === 2 && pinch) {
+        const [a, b] = [...pts.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        const c = toMap({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 });
+        this.zoomMap(svg, (pinch.w * (pinch.d / Math.max(20, d))) / this.mapView.w, c.x, c.y);
+        moved += 20;
+        return;
+      }
+      const dx = cur.x - prev.x;
+      const dy = cur.y - prev.y;
+      moved += Math.abs(dx) + Math.abs(dy);
+      if (moved > 6) {
+        const k = scale();
+        const v = this.mapView;
+        this.setMapView(svg, { ...v, x: v.x - dx * k, y: v.y - dy * k });
+      }
+    });
+    const up = (e) => {
+      pts.delete(e.pointerId);
+      if (pts.size < 2) pinch = null;
+    };
+    svg.addEventListener('pointerup', up);
+    svg.addEventListener('pointercancel', up);
+    svg.addEventListener('pointerleave', up);
+    svg.addEventListener(
+      'wheel',
+      (e) => {
+        e.preventDefault();
+        const c = toMap(e);
+        this.zoomMap(svg, e.deltaY > 0 ? 1.15 : 0.87, c.x, c.y);
+      },
+      { passive: false },
+    );
+    return () => moved > 6;
+  }
+
   openCountry(id) {
     const c = COUNTRIES[id];
     const data = this.data;
     const st = countryState(data, id);
     const playable = canPlayCountry(data, id);
-    const neighbors = c.neighbors.map((n) => `<span class="chip">${COUNTRIES[n].flag} ${esc(COUNTRIES[n].name)}</span>`).join('');
+    const neighbors = [
+      ...c.neighbors.map((n) => `<span class="chip">${COUNTRIES[n].flag} ${esc(COUNTRIES[n].name)}</span>`),
+      ...c.sea.map((n) => `<span class="chip sea">⛴️ ${COUNTRIES[n].flag} ${esc(COUNTRIES[n].name)}</span>`),
+    ].join('');
     const cities = c.cities
       .map((city) => {
         const done = isCityDone(data, city.id);
