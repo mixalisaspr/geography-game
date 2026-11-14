@@ -45,7 +45,7 @@ export const CENTRAL = {
     language: 'Γερμανικά',
     currency: 'Ευρώ (€)',
     lonLat: [14.5, 47.6],
-    neighbors: ['hungary', 'slovenia', 'italy'],
+    neighbors: ['hungary', 'slovenia', 'italy', 'germany', 'czechia', 'slovakia', 'switzerland'],
     intro: 'Μια ορεινή χώρα στην καρδιά της Ευρώπης: σχεδόν τα δύο τρίτα της είναι Άλπεις! Είναι η πατρίδα πολλών μεγάλων μουσικών.',
     cities: [
       city('vienna', 'Βιέννη', 'Η πρωτεύουσα της Αυστρίας, πόλη των παλατιών, των καφέ και της κλασικής μουσικής.', [
@@ -80,7 +80,7 @@ export const CENTRAL = {
     language: 'Ιταλικά',
     currency: 'Ευρώ (€)',
     lonLat: [12.5, 42.8],
-    neighbors: ['austria', 'slovenia'],
+    neighbors: ['austria', 'slovenia', 'switzerland'],
     sea: ['greece'],
     intro: 'Η χώρα σε σχήμα μπότας! Είναι από τις χώρες με τα περισσότερα μνημεία παγκόσμιας κληρονομιάς της UNESCO, και η πατρίδα της πίτσας.',
     cities: [

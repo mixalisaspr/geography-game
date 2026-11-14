@@ -1502,7 +1502,7 @@ export const COUNTRIES = {
     language: 'Ουγγρικά',
     currency: 'Φιορίνι',
     lonLat: [19.4, 47.1], // θέση στον χάρτη (μήκος, πλάτος)
-    neighbors: ['romania', 'serbia', 'croatia', 'austria', 'slovenia'],
+    neighbors: ['romania', 'serbia', 'croatia', 'austria', 'slovenia', 'slovakia'],
     intro:
       'Τα ουγγρικά δεν μοιάζουν με τις γλώσσες των γειτόνων τους – συγγενεύουν μακρινά με τα φινλανδικά! Η χώρα έχει πολλές θερμές πηγές και τη μεγάλη λίμνη Μπάλατον.',
     cities: [
