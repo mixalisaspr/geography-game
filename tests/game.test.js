@@ -305,3 +305,13 @@ test('κάθε πτώση με το κεφάλι μετράει μία φορά'
   assert.equal(crashes, 3);
   assert.equal(sim.crashes, 3);
 });
+
+test('ο service worker κρατάει offline όλα τα αρχεία JavaScript', async () => {
+  const { readFileSync, readdirSync } = await import('node:fs');
+  const sw = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
+  const files = [
+    ...readdirSync(new URL('../js', import.meta.url)).filter((f) => f.endsWith('.js')).map((f) => `./js/${f}`),
+    ...readdirSync(new URL('../js/data', import.meta.url)).filter((f) => f.endsWith('.js')).map((f) => `./js/data/${f}`),
+  ];
+  for (const f of files) assert.ok(sw.includes(`'${f}'`), `λείπει από το sw.js: ${f}`);
+});

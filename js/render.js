@@ -491,7 +491,29 @@ export const LANDMARKS = {
     ctx.fillStyle = '#5a4a40';
     windowsGrid(ctx, -50, -46, 5, 1, 22, 0, 7, 12);
   },
-  church(ctx) {
+  church(ctx, t, th) {
+    // απλή εκκλησία με καμπαναριό
+    const c = '#f1ebdc';
+    const roof = '#9c3b2e';
+    ctx.fillStyle = c;
+    ctx.fillRect(-60, -56, 120, 56);
+    ctx.fillStyle = roof;
+    poly(ctx, [-68, -56, 0, -98, 68, -56]);
+    ctx.fill();
+    ctx.fillStyle = c;
+    ctx.fillRect(56, -150, 32, 150);
+    ctx.fillStyle = '#4f5d6b';
+    poly(ctx, [52, -150, 72, -205, 92, -150]);
+    ctx.fill();
+    ctx.fillStyle = '#c9a646';
+    ctx.fillRect(71, -222, 2, 18);
+    ctx.fillRect(66, -216, 12, 2);
+    ctx.fillStyle = '#4a4036';
+    ctx.fillRect(66, -130, 12, 20);
+    ctx.fillRect(-10, -34, 20, 34);
+    for (const x of [-44, 28]) ctx.fillRect(x, -40, 10, 16);
+  },
+  stMark(ctx) {
     const c = '#f1ebdc';
     ctx.fillStyle = c;
     ctx.fillRect(-70, -60, 140, 60);

@@ -1249,7 +1249,7 @@ export const COUNTRIES = {
           surface: 'road',
           ground: '#806c58',
           top: '#55575e',
-          landmarks: ['church', 'gothic'],
+          landmarks: ['stMark', 'gothic'],
           obstacles: ['crate', 'barrel', 'rock'],
           deco: ['birch', 'pine'],
         }),
