@@ -576,6 +576,109 @@ export const LANDMARKS = {
     ctx.fillStyle = '#7d7a73';
     windowsGrid(ctx, -230, -58, 24, 2, 19.5, 24, 8, 14);
   },
+  eiffel(ctx) {
+    const c = '#6b5a4a';
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.moveTo(-70, 0);
+    ctx.quadraticCurveTo(-30, -60, -12, -170);
+    ctx.lineTo(-4, -260);
+    ctx.lineTo(4, -260);
+    ctx.lineTo(12, -170);
+    ctx.quadraticCurveTo(30, -60, 70, 0);
+    ctx.lineTo(42, 0);
+    ctx.quadraticCurveTo(0, -60, -42, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillRect(-46, -66, 92, 8);
+    ctx.fillRect(-24, -150, 48, 6);
+    ctx.fillRect(-1.5, -285, 3, 26);
+  },
+  bigben(ctx) {
+    const c = '#c9a86a';
+    ctx.fillStyle = c;
+    ctx.fillRect(-20, -220, 40, 220);
+    ctx.fillStyle = shade(c, -0.15);
+    ctx.fillRect(10, -220, 10, 220);
+    ctx.fillStyle = '#3d4a4f';
+    poly(ctx, [-24, -220, 0, -290, 24, -220]);
+    ctx.fill();
+    ctx.fillStyle = '#fff8e6';
+    ctx.beginPath();
+    ctx.arc(0, -190, 15, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, -190);
+    ctx.lineTo(0, -201);
+    ctx.moveTo(0, -190);
+    ctx.lineTo(8, -190);
+    ctx.stroke();
+    ctx.fillStyle = shade(c, -0.05);
+    ctx.fillRect(20, -70, 180, 70);
+    ctx.fillStyle = '#3d4a4f';
+    for (let i = 0; i < 9; i++) poly(ctx, [24 + i * 20, -70, 30 + i * 20, -86, 36 + i * 20, -70]), ctx.fill();
+  },
+  colosseum(ctx) {
+    const c = '#d7b98e';
+    ctx.fillStyle = c;
+    ctx.beginPath();
+    ctx.moveTo(-170, 0);
+    ctx.lineTo(-170, -110);
+    ctx.quadraticCurveTo(0, -140, 150, -120);
+    ctx.lineTo(150, -60);
+    ctx.lineTo(120, -40);
+    ctx.lineTo(120, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#7a5f45';
+    for (let r = 0; r < 3; r++)
+      for (let i = 0; i < 9; i++) {
+        const x = -158 + i * 30;
+        const y = -14 - r * 34;
+        if (x > 110 && r > 0) continue;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x, y - 16);
+        ctx.arc(x + 8, y - 16, 8, Math.PI, 0);
+        ctx.lineTo(x + 16, y);
+        ctx.fill();
+      }
+  },
+  gate(ctx) {
+    const c = '#e2d6bd';
+    ctx.fillStyle = c;
+    ctx.fillRect(-120, -26, 240, 26);
+    for (let i = 0; i < 6; i++) ctx.fillRect(-112 + i * 42, -120, 16, 96);
+    ctx.fillRect(-126, -146, 252, 28);
+    ctx.fillRect(-60, -164, 120, 20);
+    ctx.fillStyle = '#4b6b55';
+    ctx.fillRect(-22, -196, 44, 32);
+    ctx.fillRect(-34, -204, 68, 10);
+  },
+  dutchMill(ctx, t) {
+    ctx.fillStyle = '#7b5a43';
+    poly(ctx, [-30, 0, -20, -110, 20, -110, 30, 0]);
+    ctx.fill();
+    ctx.fillStyle = '#4e3a2c';
+    poly(ctx, [-24, -108, 0, -136, 24, -108]);
+    ctx.fill();
+    ctx.save();
+    ctx.translate(0, -112);
+    ctx.rotate(t * 0.8);
+    ctx.fillStyle = 'rgba(245,240,230,0.95)';
+    ctx.strokeStyle = '#5b4636';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      ctx.rotate(Math.PI / 2);
+      ctx.fillRect(3, -90, 16, 80);
+      ctx.strokeRect(3, -90, 16, 80);
+    }
+    ctx.restore();
+    ctx.fillStyle = '#f4d35e';
+    for (let i = 0; i < 9; i++) ctx.fillRect(-150 + i * 34, -4, 22, 6);
+  },
 };
 
 // ---------- δέντρα ----------

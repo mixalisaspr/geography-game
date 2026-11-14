@@ -239,7 +239,7 @@ test('μετά την Ελλάδα ανοίγουν μόνο οι γείτονέ
   const r = finishCountry(d, 'greece');
   assert.equal(r.countryCompleted, true);
   assert.equal(d.lastCompleted, 'greece');
-  assert.deepEqual(availableCountries(d).sort(), [...COUNTRIES.greece.neighbors].sort());
+  assert.deepEqual(availableCountries(d).sort(), [...links('greece')].sort());
   assert.ok(!canPlayCountry(d, 'serbia'));
   assert.ok(canPlayCountry(d, 'greece')); // ξαναπαίζεται
 });
@@ -251,7 +251,7 @@ test('η επόμενη χώρα πρέπει να συνορεύει με αυ�
   recordCityResult(d, COUNTRIES.albania.cities[0], { stars: 1, quiz: false, time: 50 });
   finishCountry(d, 'bulgaria');
   const av = availableCountries(d);
-  for (const n of COUNTRIES.bulgaria.neighbors) if (n !== 'greece') assert.ok(av.includes(n), n);
+  for (const n of links('bulgaria')) if (n !== 'greece') assert.ok(av.includes(n), n);
   assert.ok(av.includes('albania'), 'η χώρα σε εξέλιξη μένει διαθέσιμη');
   assert.ok(!av.includes('hungary'));
   assert.ok(!av.includes('greece'), 'οι ολοκληρωμένες δεν μετρούν ως «νέες»');

@@ -40,6 +40,7 @@ export const COUNTRIES = {
     currency: 'Ευρώ (€)',
     lonLat: [22.5, 39.3], // θέση στον χάρτη (μήκος, πλάτος)
     neighbors: ['albania', 'north-macedonia', 'bulgaria', 'turkey'],
+    sea: ['italy'],
     intro:
       'Η χώρα του ήλιου και της θάλασσας, με περίπου 6.000 νησιά και νησίδες! Εδώ γεννήθηκαν η δημοκρατία, το θέατρο και οι Ολυμπιακοί Αγώνες.',
     cities: [
@@ -1207,7 +1208,7 @@ export const COUNTRIES = {
     language: 'Κροατικά',
     currency: 'Ευρώ (€)',
     lonLat: [16.0, 45.3], // θέση στον χάρτη (μήκος, πλάτος)
-    neighbors: ['hungary', 'serbia', 'bosnia', 'montenegro'],
+    neighbors: ['hungary', 'serbia', 'bosnia', 'montenegro', 'slovenia'],
     intro:
       'Η Κροατία έχει πάνω από 1.000 νησιά και νησίδες στην Αδριατική θάλασσα και μία από τις πιο όμορφες ακτογραμμές της Ευρώπης.',
     cities: [
@@ -1501,7 +1502,7 @@ export const COUNTRIES = {
     language: 'Ουγγρικά',
     currency: 'Φιορίνι',
     lonLat: [19.4, 47.1], // θέση στον χάρτη (μήκος, πλάτος)
-    neighbors: ['romania', 'serbia', 'croatia'],
+    neighbors: ['romania', 'serbia', 'croatia', 'austria', 'slovenia'],
     intro:
       'Τα ουγγρικά δεν μοιάζουν με τις γλώσσες των γειτόνων τους – συγγενεύουν μακρινά με τα φινλανδικά! Η χώρα έχει πολλές θερμές πηγές και τη μεγάλη λίμνη Μπάλατον.',
     cities: [
