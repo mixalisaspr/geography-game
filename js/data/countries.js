@@ -47,7 +47,6 @@ export const COUNTRIES = {
       {
         id: 'athens',
         name: 'Αθήνα',
-        rider: true, // νέα, πολύ πιο δύσκολη πίστα με μεγάλα άλματα (δοκιμαστικά μόνο εδώ)
         intro:
           'Η πρωτεύουσα της Ελλάδας και μία από τις αρχαιότερες πόλεις του κόσμου. Πάνω από την πόλη δεσπόζει η Ακρόπολη.',
         items: [
@@ -1654,6 +1653,8 @@ for (const [countryId, c] of Object.entries(COUNTRIES)) {
   c.cities.forEach((city, ci) => {
     city.countryId = countryId;
     city.index = ci;
+    // όλες οι πίστες είναι πλέον «rider»: μεγάλα άλματα, γκρεμοί, τούμπες, νέοι πόντοι
+    city.rider = city.rider ?? true;
     city.items.forEach((it, ii) => {
       it.id = `${city.id}-${ii}`;
       it.cityId = city.id;

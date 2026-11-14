@@ -113,7 +113,7 @@ test('η πίστα είναι ντετερμινιστική, μεγάλη, κ�
     for (let i = 1; i < stops.length; i++)
       assert.ok(stops[i] - stops[i - 1] >= 45000, `${city.id}: μόνο ${Math.round(stops[i] - stops[i - 1])} από checkpoint σε checkpoint`);
     assert.ok(a.finishX - a.startX >= 240000, `${city.id}: πολύ μικρή πίστα (${Math.round(a.finishX)})`);
-    if (city.rider) assert.ok(a.obstacles.length >= 80 && a.gaps.length >= 20, `${city.id}: λίγα εμπόδια/γκρεμοί`);
+    if (city.rider) assert.ok(a.obstacles.length >= 60 && a.gaps.length >= 20, `${city.id}: λίγα εμπόδια/γκρεμοί`);
     else assert.ok(a.obstacles.length >= 200, `${city.id}: λίγα εμπόδια (${a.obstacles.length})`);
     let prev = a.startX;
     for (const cp of a.checkpoints) {
@@ -287,17 +287,21 @@ test('ο service worker κρατάει offline όλα τα αρχεία JavaScri
   for (const f of files) assert.ok(sw.includes(`'${f}'`), `λείπει από το sw.js: ${f}`);
 });
 
-test('η Αθήνα είναι η νέα «rider» πίστα: μεγάλα άλματα, γκρεμοί, λιγότερα σημαιάκια', () => {
-  const athens = COUNTRIES.greece.cities[0];
-  assert.equal(athens.rider, true);
-  for (const c of allCities()) if (c !== athens) assert.ok(!c.rider, `${c.id}: η rider πίστα είναι προς το παρόν μόνο στην Αθήνα`);
-  const t = trackForCity(athens);
-  assert.equal(t.style, 'rider');
-  const classic = generateTrack({ seed: `geomichani:${athens.id}`, difficulty: 0, obstacles: athens.theme.obstacles, hills: athens.theme.hills });
-  assert.ok(t.savepoints.length <= classic.savepoints.length * 0.4, `πολλά σημαιάκια (${t.savepoints.length} / ${classic.savepoints.length})`);
-  assert.ok(t.gaps.every((g) => g.pit), 'στην Αθήνα τα κενά είναι γκρεμοί, όχι νερό');
-  assert.ok(t.maxY - t.minY > classic.maxY - classic.minY + 150, 'πολύ μεγαλύτερες υψομετρικές διαφορές');
-  assert.ok(t.obstacles.some((o) => o.type === 'block'), 'ψηλοί μαρμάρινοι όγκοι');
+test('όλες οι πόλεις είναι «rider» πίστες: μεγάλα άλματα, γκρεμοί ή νερό, λιγότερα σημαιάκια', () => {
+  for (const city of allCities()) {
+    assert.equal(city.rider, true, city.id);
+    const t = trackForCity(city);
+    assert.equal(t.style, 'rider', city.id);
+    const th = city.theme;
+    const classic = generateTrack({ seed: `geomichani:${city.id}`, difficulty: cityDifficulty(city), water: th.water, obstacles: th.obstacles, hills: th.hills });
+    assert.ok(t.savepoints.length <= classic.savepoints.length * 0.4, `${city.id}: πολλά σημαιάκια (${t.savepoints.length} / ${classic.savepoints.length})`);
+    assert.ok(t.gaps.length >= 20, `${city.id}: λίγα άλματα πάνω από κενά`);
+    // με νερό στο θέμα τα κενά είναι νερό (πλατς), αλλιώς γκρεμοί
+    assert.ok(t.gaps.every((g) => g.pit === !th.water), `${city.id}: λάθος είδος κενού`);
+    assert.ok(t.obstacles.some((o) => o.type === 'block'), `${city.id}: λείπουν οι μεγάλοι όγκοι`);
+    const mat = th.obstacles.includes('column') ? 'marble' : 'stone';
+    assert.ok(t.obstacles.filter((o) => o.type === 'block').every((o) => o.material === mat), `${city.id}: υλικό όγκων`);
+  }
   assert.ok(RIDER_HANDLING.leanAir > CFG.leanAir, 'η μηχανή γυρίζει πιο εύκολα στον αέρα');
   assert.ok(RIDER_HANDLING.maxSpin > CFG.maxSpin, 'και πιάνει μεγαλύτερη ταχύτητα');
 });

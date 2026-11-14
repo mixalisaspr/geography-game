@@ -506,11 +506,11 @@ export class UI {
       <div class="help">
         <div class="help-row"><span class="key">▶</span><p><b>Γκάζι</b> (δεξιά πλευρά της οθόνης ή →): η μηχανή προχωράει. Στον αέρα γέρνει <b>πίσω</b>.</p></div>
         <div class="help-row"><span class="key">◀</span><p><b>Φρένο</b> (αριστερή πλευρά ή ←): φρενάρει / κάνει όπισθεν. Στον αέρα γέρνει <b>μπροστά</b>.</p></div>
-        <div class="help-row"><span class="key">⚠️</span><p>Αν κρατάς συνέχεια γκάζι, θα αναποδογυρίσεις! Στα <b>άλματα</b> (πινακίδα ⚠️) <b>άφησε το γκάζι</b> μόλις σηκωθείς στον αέρα.</p></div>
+        <div class="help-row"><span class="key">⚠️</span><p>Στα <b>άλματα</b> (πινακίδα ⚠️) η μηχανή γυρίζει γρήγορα: <b>ίσιωσέ τη</b> με γκάζι/φρένο πριν προσγειωθείς. Στους <b>γκρεμούς</b> θέλεις φουλ γκάζι!</p></div>
         <div class="help-row"><span class="key">🚩</span><p>Στα <b>checkpoints</b> μαζεύεις αντικείμενα 🎒 και διαβάζεις πληροφορίες 📖 για τη χώρα. Αν πέσεις, συνεχίζεις από το τελευταίο checkpoint.</p></div>
-        <div class="help-row"><span class="key">🎓</span><p>Στον τερματισμό σε περιμένει ένα <b>mini quiz</b> με όσα έμαθες. Κάθε σωστή απάντηση σού δίνει <b>+1 πόντο</b> 🏆.</p></div>
-        <div class="help-row"><span class="key">💥</span><p>Αν πέσεις με το κεφάλι, η μηχανή <b>εκρήγνυται</b> και χάνεις <b>1 πόντο</b>! Το ίδιο αν πέσεις στο νερό.</p></div>
-        <div class="help-row"><span class="key">🔄</span><p><b>Αθήνα (νέα πίστα):</b> μεγάλα άλματα και γκρεμοί! Κερδίζεις πόντους όσο προχωράς και με <b>τούμπες</b> στον αέρα· οι πτώσεις αφαιρούν ${RIDER_SCORE.crash}, αλλά το σκορ δεν πέφτει ποτέ κάτω από 0.</p></div>
+        <div class="help-row"><span class="key">🎓</span><p>Στον τερματισμό σε περιμένει ένα <b>mini quiz</b> με όσα έμαθες. Κάθε σωστή απάντηση σού δίνει <b>+${RIDER_SCORE.quiz} πόντους</b> 🏆.</p></div>
+        <div class="help-row"><span class="key">💥</span><p>Αν πέσεις με το κεφάλι, η μηχανή <b>εκρήγνυται</b> και χάνεις <b>${RIDER_SCORE.crash} πόντους</b>! Το ίδιο αν πέσεις στο νερό ή στον γκρεμό.</p></div>
+        <div class="help-row"><span class="key">🔄</span><p>Κερδίζεις πόντους <b>όσο προχωράς</b> και με <b>τούμπες</b> στον αέρα (+${RIDER_SCORE.flip}). Το σκορ δεν πέφτει ποτέ κάτω από 0.</p></div>
         <div class="help-row"><span class="key">🗺️</span><p>Όταν τελειώσεις όλες τις πόλεις μιας χώρας, μπορείς να πας μόνο σε μια χώρα που <b>συνορεύει</b> μαζί της.</p></div>
       </div>
       <div class="actions"><button class="btn primary" data-act="ok">Κατάλαβα!</button></div>`,
