@@ -149,7 +149,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
       flat(80);
       obs.push(makeObstacle(pick(obstacles), x + 40, y, rnd));
       flat(200);
-      const h = R(40, 80) * amp;
+      const h = Math.min(R(40, 80) * amp, 75); // κλίση το πολύ ~25°
       maybeSave();
       curve(260, (t) => -h * (1 - Math.cos(Math.PI * t)) * 0.5);
       flat(60);
@@ -192,8 +192,8 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   flat(800); // x = 200
   const startX = 0;
 
-  // ΜΕΓΑΛΕΣ πίστες: ~24.000–40.000 μονάδες (περίπου 1,5–3 λεπτά οδήγησης)
-  const length = 24000 + 16000 * d;
+  // ΤΕΡΑΣΤΙΕΣ πίστες: ~60.000–100.000 μονάδες (περίπου 3–6 λεπτά οδήγησης)
+  const length = 60000 + 40000 * d;
   const parts = checkpointCount + 1;
   const chunk = length / parts;
   lastSave = x;

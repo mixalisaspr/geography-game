@@ -91,8 +91,8 @@ test('η πίστα είναι ντετερμινιστική, μεγάλη, κ�
     const b = trackForCity(city);
     assert.deepEqual(a.points, b.points, `${city.id}: μη ντετερμινιστική`);
     assert.equal(a.checkpoints.length, 4);
-    assert.ok(a.finishX - a.startX >= 24000, `${city.id}: πολύ μικρή πίστα (${Math.round(a.finishX)})`);
-    assert.ok(a.obstacles.length >= 25, `${city.id}: λίγα εμπόδια (${a.obstacles.length})`);
+    assert.ok(a.finishX - a.startX >= 60000, `${city.id}: πολύ μικρή πίστα (${Math.round(a.finishX)})`);
+    assert.ok(a.obstacles.length >= 60, `${city.id}: λίγα εμπόδια (${a.obstacles.length})`);
     let prev = a.startX;
     for (const cp of a.checkpoints) {
       assert.ok(cp > prev, `${city.id}: checkpoints εκτός σειράς`);
@@ -113,7 +113,7 @@ test('κάθε πίστα τερματίζεται από τον αυτόματ�
   for (const city of allCities()) {
     const sim = new LevelSim(trackForCity(city));
     let t = 0;
-    while (t < 600 && sim.state !== 'finished') {
+    while (t < 1500 && sim.state !== 'finished') {
       sim.update(1 / 60, autopilot(sim.bike));
       t += 1 / 60;
     }
@@ -137,7 +137,9 @@ const human = () => {
     hist.push(b.angle);
     const a = hist[Math.max(0, hist.length - 16)];
     if (!b.grounded) return { gas: a > -0.2, brake: a < -0.7 };
-    return { gas: a > -0.45, brake: false };
+    // στο έδαφος κοιτάει τη γωνία ως προς την κλίση (στις ανηφόρες κρατάει γκάζι)
+    const n = b.contact[0] || b.contact[1];
+    return { gas: b.angle - Math.atan2(n.x, -n.y) > -0.45, brake: false };
   };
 };
 
@@ -145,7 +147,7 @@ test('ένας παίκτης που αφήνει το γκάζι (με καθυ
   for (const city of allCities()) {
     const sim = new LevelSim(trackForCity(city));
     const ctl = human();
-    for (let t = 0; t < 600 && sim.state !== 'finished'; t += 1 / 60) sim.update(1 / 60, ctl(sim.bike));
+    for (let t = 0; t < 1500 && sim.state !== 'finished'; t += 1 / 60) sim.update(1 / 60, ctl(sim.bike));
     assert.equal(sim.state, 'finished', city.id);
     assert.ok(sim.crashes <= 3, `${city.id}: ${sim.crashes} πτώσεις`);
   }
