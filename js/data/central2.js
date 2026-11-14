@@ -45,7 +45,7 @@ export const CENTRAL2 = {
     language: 'Γερμανικά',
     currency: 'Ευρώ (€)',
     lonLat: [10.4, 51.1],
-    neighbors: ['austria', 'switzerland', 'czechia', 'poland', 'france', 'luxembourg', 'belgium', 'netherlands'],
+    neighbors: ['austria', 'switzerland', 'czechia', 'poland', 'france', 'luxembourg', 'belgium', 'netherlands', 'denmark'],
     intro: 'Η χώρα με τον μεγαλύτερο πληθυσμό στην Ευρωπαϊκή Ένωση. Οι Γερμανοί φτιάχνουν πάνω από 1.000 είδη λουκάνικων και χιλιάδες είδη ψωμιού!',
     cities: [
       city('berlin', 'Βερολίνο', 'Η πρωτεύουσα της Γερμανίας, μια μεγάλη πόλη με πολλή ιστορία, μουσεία και πάρκα.', [

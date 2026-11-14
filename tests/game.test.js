@@ -25,7 +25,7 @@ const allCities = () => Object.values(COUNTRIES).flatMap((c) => c.cities);
 
 test('τα σύνορα είναι αμφίδρομα και δείχνουν σε υπαρκτές χώρες', () => {
   for (const [id, c] of Object.entries(COUNTRIES)) {
-    assert.ok(c.neighbors.length > 0, `${id} χωρίς γείτονες`);
+    assert.ok(links(id).length > 0, `${id} χωρίς γείτονες ή θαλάσσια σύνδεση`);
     for (const n of c.neighbors) {
       assert.ok(COUNTRIES[n], `${id}: άγνωστος γείτονας ${n}`);
       assert.ok(COUNTRIES[n].neighbors.includes(id), `${n} δεν έχει γείτονα την ${id}`);
