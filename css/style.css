@@ -176,6 +176,21 @@ body[data-screen='play'] #touch-layer {
   min-width: 62px;
   text-align: center;
 }
+.hud-chip.combo {
+  background: linear-gradient(180deg, #fed7aa, #fb923c);
+  color: #7c2d12;
+  min-width: 0;
+}
+.hud-chip[hidden] {
+  display: none;
+}
+@media (max-width: 560px) {
+  .hud-chip {
+    padding: 6px 8px;
+    min-width: 0;
+    font-size: 13px;
+  }
+}
 .hud-chip.points.negative {
   color: var(--red);
 }

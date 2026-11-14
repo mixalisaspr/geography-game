@@ -4,7 +4,7 @@ import { LevelSim, autopilot } from './physics.js';
 import { Renderer } from './render.js';
 import { trackForCity } from './levels.js';
 import { COUNTRIES, cityDifficulty } from './data/countries.js';
-import { RIDER_SCORE } from './progress.js';
+import { RIDER_SCORE, trickPoints } from './progress.js';
 
 export class Game {
   constructor(canvas, sound) {
@@ -38,6 +38,8 @@ export class Game {
     this.mode = mode;
     this.paused = false;
     this.finishTimer = 0;
+    this.coinChain = 0;
+    this.lastCoinAt = -9;
     this.input.gas = this.input.brake = false;
     const helmet = country.colors[0].toLowerCase() === '#ffffff' ? country.colors[1] : country.colors[0];
     this.renderer.setLevel({
@@ -103,6 +105,7 @@ export class Game {
     const c = sim.bike.center;
     if (e.type === 'crash') {
       r.shake = 0.6;
+      this.lastMult = 0;
       if (e.reason === 'water') {
         r.burst(c.x, sim.world.gapAt(c.x)?.waterY ?? c.y, '#cfe9ff', 30, 260, 500);
         r.floatText(c.x, c.y - 60, 'Πλατς! 💦', '#bfe3ff', 30);
@@ -118,10 +121,41 @@ export class Game {
       }
     } else if (e.type === 'flip') {
       if (this.mode === 'play') {
-        r.floatText(c.x, c.y - 80, e.count > 1 ? `🔄 ${e.count}× Τούμπα!` : '🔄 Τούμπα!', '#fde047', 28);
+        const name = e.dir === 'front' ? 'Τούμπα μπροστά' : 'Τούμπα πίσω';
+        const pts = trickPoints(RIDER_SCORE.flip, e.mult, e.count);
+        r.floatText(c.x, c.y - 80, `🔄 ${e.count > 1 ? `${e.count}× ` : ''}${name}! +${pts}`, '#fde047', 28);
+        this.comboFx(e.mult, c);
         this.sound.tone(660, 0.1, 'square', 0.1);
         this.sound.tone(990, 0.14, 'square', 0.1, 0.09);
-        this.emit('flip', e.count);
+        this.emit('flip', e.count, pts, e.mult);
+      }
+    } else if (e.type === 'perfect') {
+      if (this.mode === 'play') {
+        const pts = trickPoints(RIDER_SCORE.perfect, e.mult);
+        r.floatText(c.x, c.y - 56, `✨ Τέλεια προσγείωση! +${pts}`, '#a7f3d0', 22);
+        r.burst(c.x, c.y + 10, '#a7f3d0', 10, 160, 200);
+        this.comboFx(e.mult, c);
+        this.sound.perfect();
+        this.emit('perfect', pts, e.mult);
+      }
+    } else if (e.type === 'land') {
+      const k = Math.min(1, e.air / 1.5);
+      r.dust(c.x, sim.bike.p[0].y + 14, 6 + Math.round(10 * k));
+      r.shake = Math.max(r.shake, 0.15 + 0.3 * k);
+      if (this.mode === 'play') this.sound.land(k);
+    } else if (e.type === 'pickup') {
+      const gem = e.kind === 'gem';
+      r.burst(e.x, e.y, gem ? '#7dd3fc' : '#fde047', gem ? 12 : 5, gem ? 200 : 110, 200);
+      if (this.mode === 'play') {
+        if (gem) {
+          r.floatText(e.x, e.y - 24, `💎 +${RIDER_SCORE.gem}`, '#bae6fd', 22);
+          this.sound.gem();
+        } else {
+          this.coinChain = sim.time - this.lastCoinAt < 1.2 ? this.coinChain + 1 : 0;
+          this.lastCoinAt = sim.time;
+          this.sound.coin(this.coinChain);
+        }
+        this.emit('pickup', e.kind);
       }
     } else if (e.type === 'savepoint') {
       r.floatText(e.x, sim.world.groundY(e.x) - 70, '✔ Σημείο επαναφοράς', '#bbf7d0', 16);
@@ -149,6 +183,16 @@ export class Game {
         setTimeout(() => this.mode === 'demo' && this.load(this.city, 'demo'), 1500);
       }
     }
+  }
+
+  /** Ο πολλαπλασιαστής ανέβηκε: δείξ' το πάνω από τη μηχανή. */
+  comboFx(mult, c) {
+    if (mult < 2 || mult === this.lastMult) {
+      this.lastMult = mult;
+      return;
+    }
+    this.lastMult = mult;
+    this.renderer.floatText(c.x, c.y - 112, `🔥 Σερί x${mult}!`, '#fb923c', 24);
   }
 
   stats() {

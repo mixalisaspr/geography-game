@@ -510,7 +510,9 @@ export class UI {
         <div class="help-row"><span class="key">🚩</span><p>Στα <b>checkpoints</b> μαζεύεις αντικείμενα 🎒 και διαβάζεις πληροφορίες 📖 για τη χώρα. Αν πέσεις, συνεχίζεις από το τελευταίο checkpoint.</p></div>
         <div class="help-row"><span class="key">🎓</span><p>Στον τερματισμό σε περιμένει ένα <b>mini quiz</b> με όσα έμαθες. Κάθε σωστή απάντηση σού δίνει <b>+${RIDER_SCORE.quiz} πόντους</b> 🏆.</p></div>
         <div class="help-row"><span class="key">💥</span><p>Αν πέσεις με το κεφάλι, η μηχανή <b>εκρήγνυται</b> και χάνεις <b>${RIDER_SCORE.crash} πόντους</b>! Το ίδιο αν πέσεις στο νερό ή στον γκρεμό.</p></div>
-        <div class="help-row"><span class="key">🔄</span><p>Κερδίζεις πόντους <b>όσο προχωράς</b> και με <b>τούμπες</b> στον αέρα (+${RIDER_SCORE.flip}). Το σκορ δεν πέφτει ποτέ κάτω από 0.</p></div>
+        <div class="help-row"><span class="key">🔄</span><p>Κερδίζεις πόντους <b>όσο προχωράς</b>, με <b>τούμπες</b> στον αέρα (+${RIDER_SCORE.flip}) και με <b>τέλειες προσγειώσεις</b> ✨ (+${RIDER_SCORE.perfect}): προσγειώσου με τις δύο ρόδες μαζί μετά από μεγάλο άλμα. Το σκορ δεν πέφτει ποτέ κάτω από 0.</p></div>
+        <div class="help-row"><span class="key">🔥</span><p><b>Σερί:</b> κάθε κόλπο στη σειρά χωρίς πτώση ανεβάζει τον πολλαπλασιαστή: x2, x3 … έως <b>x5</b>. Αν πέσεις, ξαναρχίζει από x1.</p></div>
+        <div class="help-row"><span class="key">💰</span><p>Μάζεψε <b>νομίσματα</b> (+${RIDER_SCORE.coin}) στον δρόμο και <b>διαμάντια</b> 💎 (+${RIDER_SCORE.gem}) στον αέρα πάνω από γκρεμούς και νερό.</p></div>
         <div class="help-row"><span class="key">🗺️</span><p>Όταν τελειώσεις όλες τις πόλεις μιας χώρας, μπορείς να πας μόνο σε μια χώρα που <b>συνορεύει</b> μαζί της.</p></div>
       </div>
       <div class="actions"><button class="btn primary" data-act="ok">Κατάλαβα!</button></div>`,
@@ -533,12 +535,17 @@ export class UI {
     this.showScreen(null);
     this.hud.hidden = false;
     // rider: νέο σύστημα πόντων (απόσταση + τούμπες + quiz − πτώσεις, ποτέ κάτω από 0)
-    this.run = { city, answers: [], correct: 0, crashes: 0, items: [], rider: !!city.rider, score: 0, dist: 0, flips: 0, lost: 0 };
+    this.run = { city, answers: [], correct: 0, crashes: 0, items: [], rider: !!city.rider, score: 0, dist: 0, flips: 0, lost: 0, coins: 0, gems: 0, perfects: 0, trickPts: 0, bestCombo: 1 };
     this.game.load(city, 'play');
     this.game.pause();
+    const pk = this.game.sim.pickups;
+    this.run.totalGems = pk.filter((p) => p.kind === 'gem').length;
+    this.run.totalCoins = pk.length - this.run.totalGems;
     $('#hud-city').textContent = `${country.flag} ${city.name}`;
     this.updateBag();
     this.updatePoints();
+    this.updateCoins();
+    this.updateCombo(1);
     this.renderProgressMarkers();
     this.openModal(
       `<div class="level-intro">
@@ -550,7 +557,8 @@ export class UI {
         ${
           city.rider
             ? `<p class="muted points-rule">⚠️ <b>Δύσκολη πίστα!</b> Μεγάλα άλματα, γκρεμοί και ψηλά εμπόδια. Στον αέρα ίσιωσε τη μηχανή με το γκάζι/φρένο – ή κάνε <b>τούμπες</b> 🔄!</p>
-        <p class="muted points-rule">🏆 Κερδίζεις πόντους όσο προχωράς · 🔄 Τούμπα: <b>+${RIDER_SCORE.flip}</b> · 🎓 Σωστή απάντηση: <b>+${RIDER_SCORE.quiz}</b> · 💥 Πτώση: <b>−${RIDER_SCORE.crash}</b> (ποτέ κάτω από 0)</p>`
+        <p class="muted points-rule">🏆 Κερδίζεις πόντους όσο προχωράς · 💰 Νόμισμα: <b>+${RIDER_SCORE.coin}</b> · 💎 Διαμάντι: <b>+${RIDER_SCORE.gem}</b> · 🔄 Τούμπα: <b>+${RIDER_SCORE.flip}</b> · ✨ Τέλεια προσγείωση: <b>+${RIDER_SCORE.perfect}</b> · 🎓 Σωστή απάντηση: <b>+${RIDER_SCORE.quiz}</b> · 💥 Πτώση: <b>−${RIDER_SCORE.crash}</b> (ποτέ κάτω από 0)</p>
+        <p class="muted points-rule">🔥 <b>Σερί:</b> κάθε κόλπο στη σειρά χωρίς πτώση ανεβάζει τον πολλαπλασιαστή (έως x5)!</p>`
             : `<p class="muted points-rule">Διάβασε προσεκτικά: στο τέλος σε περιμένει <b>mini quiz</b>! 🏆 Σωστή απάντηση: <b>+1</b> · 💥 Πτώση: <b>−1</b></p>`
         }
       </div>
@@ -587,6 +595,26 @@ export class UI {
     $('#hud-bag').textContent = `🎒 ${n}/${city.items.length}`;
   }
 
+  updateCoins() {
+    const run = this.run;
+    $('#hud-coins').textContent = run.gems ? `💰 ${run.coins} 💎 ${run.gems}` : `💰 ${run.coins}`;
+  }
+
+  /** Ο πολλαπλασιαστής των κόλπων φαίνεται μόνο όταν είναι πάνω από x1. */
+  updateCombo(mult) {
+    const el = $('#hud-combo');
+    const was = el.hidden ? 1 : Number(el.dataset.mult);
+    el.hidden = mult < 2;
+    el.dataset.mult = mult;
+    el.textContent = `🔥 x${mult}`;
+    if (mult > was) {
+      el.classList.remove('up');
+      void el.offsetWidth;
+      el.classList.add('up');
+    }
+    if (this.run) this.run.bestCombo = Math.max(this.run.bestCombo, mult);
+  }
+
   updatePoints(change = 0) {
     const el = $('#hud-points');
     el.textContent = `🏆 ${this.points}`;
@@ -601,6 +629,7 @@ export class UI {
   onCrash() {
     if (!this.run) return;
     this.run.crashes++;
+    this.updateCombo(1);
     if (this.run.rider) this.addRiderScore(-RIDER_SCORE.crash);
     else this.updatePoints(-1);
   }
@@ -761,7 +790,10 @@ export class UI {
             ${
               run.rider
                 ? `<span class="plus">🛣️ Απόσταση: +${run.dist}</span>
-            <span class="plus">🔄 ${plural(run.flips, 'τούμπα', 'τούμπες')}: +${run.flips * RIDER_SCORE.flip}</span>
+            <span class="plus">💰 ${plural(run.coins, 'νόμισμα', 'νομίσματα')} από ${run.totalCoins}: +${run.coins * RIDER_SCORE.coin}</span>
+            <span class="plus">💎 ${plural(run.gems, 'διαμάντι', 'διαμάντια')} από ${run.totalGems}: +${run.gems * RIDER_SCORE.gem}</span>
+            <span class="plus">🔄 ${plural(run.flips, 'τούμπα', 'τούμπες')} · ✨ ${plural(run.perfects, 'τέλεια προσγείωση', 'τέλειες προσγειώσεις')}: +${run.trickPts}</span>
+            <span class="plus">🔥 Καλύτερο σερί: x${run.bestCombo}</span>
             <span class="plus">🎓 ${plural(correct, 'σωστή απάντηση', 'σωστές απαντήσεις')}: +${correct * RIDER_SCORE.quiz}</span>
             <span class="minus">💥 ${plural(crashes, 'πτώση', 'πτώσεις')}: −${run.lost}</span>`
                 : `<span class="plus">🎓 ${plural(correct, 'σωστή απάντηση', 'σωστές απαντήσεις')}: +${correct}</span>
@@ -971,10 +1003,27 @@ export class UI {
       this.onCheckpoint(i);
     });
     g.on('crash', () => this.onCrash());
-    g.on('flip', (n) => {
+    g.on('flip', (n, pts, mult) => {
       if (!this.run?.rider) return;
       this.run.flips += n;
-      this.addRiderScore(n * RIDER_SCORE.flip);
+      this.run.trickPts += pts;
+      this.addRiderScore(pts);
+      this.updateCombo(mult);
+    });
+    g.on('perfect', (pts, mult) => {
+      if (!this.run?.rider) return;
+      this.run.perfects++;
+      this.run.trickPts += pts;
+      this.addRiderScore(pts);
+      this.updateCombo(mult);
+    });
+    g.on('pickup', (kind) => {
+      const run = this.run;
+      if (!run) return;
+      if (kind === 'gem') run.gems++;
+      else run.coins++;
+      this.updateCoins();
+      if (run.rider) this.addRiderScore(kind === 'gem' ? RIDER_SCORE.gem : RIDER_SCORE.coin, kind === 'gem');
     });
     g.on('finish', (stats) => {
       this.resetInput();

@@ -189,7 +189,7 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
     curve(Math.max(420, Math.abs(dh) * 3.6), (t) => dh * (1 - (1 - t) * (1 - t)));
   };
   // ένταση: η πίστα ξεκινά πιο ήπια και φτάνει στο πλήρες μέγεθος στο ~40% της διαδρομής
-  const TOTAL = 240000 + 160000 * d;
+  const TOTAL = 80000 + 40000 * d;
   const I = () => 0.65 + 0.35 * Math.min(1, Math.max(0, x / (TOTAL * 0.4)));
   const sign = (gapAhead) => jumps.push({ x: x - 200, rampX: x, pit: gapAhead && !water, water: gapAhead && !!water });
   // υλικό των μεγάλων όγκων: μάρμαρο όπου υπάρχουν αρχαίοι κίονες, αλλιώς πέτρα
@@ -325,8 +325,8 @@ export function generateTrack({ seed, difficulty = 0, water = null, obstacles = 
   flat(800); // x = 200
   const startX = 0;
 
-  // ΤΕΡΑΣΤΙΕΣ πίστες: ~240.000–400.000 μονάδες, δηλαδή 48.000–80.000 από checkpoint σε checkpoint
-  // (περίπου 2,5–4 λεπτά οδήγησης ανά κομμάτι, 12–20 λεπτά ανά πίστα)
+  // Πίστες ~80.000–120.000 μονάδες, δηλαδή 16.000–24.000 από checkpoint σε checkpoint
+  // (περίπου 1 λεπτό οδήγησης ανά κομμάτι, 4–6 λεπτά ανά πίστα): μαθαίνεις κάτι νέο κάθε λεπτό
   const length = TOTAL;
   const parts = checkpointCount + 1;
   const chunk = length / parts;

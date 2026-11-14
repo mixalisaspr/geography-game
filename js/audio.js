@@ -91,6 +91,21 @@ export class Sound {
   finish() {
     [523, 659, 784, 659, 784, 1047].forEach((f, i) => this.tone(f, 0.22, 'triangle', 0.22, i * 0.11));
   }
+  /** Νόμισμα: ο τόνος ανεβαίνει όσο τα μαζεύεις στη σειρά. */
+  coin(chain = 0) {
+    const f = 988 * 2 ** (Math.min(chain, 12) / 12);
+    this.tone(f, 0.07, 'square', 0.07);
+    this.tone(f * 1.5, 0.12, 'square', 0.06, 0.05);
+  }
+  gem() {
+    [1319, 1568, 2093].forEach((f, i) => this.tone(f, 0.16, 'sine', 0.16, i * 0.06));
+  }
+  land(strength = 1) {
+    this.noise(0.14, 0.12 + 0.12 * strength, 260);
+  }
+  perfect() {
+    [784, 1047, 1319].forEach((f, i) => this.tone(f, 0.14, 'triangle', 0.16, i * 0.06));
+  }
   click() {
     this.tone(700, 0.05, 'square', 0.06);
   }
