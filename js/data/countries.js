@@ -1061,7 +1061,7 @@ export const COUNTRIES = {
     language: 'Ρουμανικά',
     currency: 'Λέου',
     lonLat: [24.9, 45.9], // θέση στον χάρτη (μήκος, πλάτος)
-    neighbors: ['bulgaria', 'serbia', 'hungary'],
+    neighbors: ['bulgaria', 'serbia', 'hungary', 'ukraine', 'moldova'],
     intro:
       'Τα ρουμανικά είναι λατινογενής γλώσσα, συγγενική με τα ιταλικά! Η χώρα έχει τα βουνά Καρπάθια, πυκνά δάση και το Δέλτα του Δούναβη.',
     cities: [
@@ -1502,7 +1502,7 @@ export const COUNTRIES = {
     language: 'Ουγγρικά',
     currency: 'Φιορίνι',
     lonLat: [19.4, 47.1], // θέση στον χάρτη (μήκος, πλάτος)
-    neighbors: ['romania', 'serbia', 'croatia', 'austria', 'slovenia', 'slovakia'],
+    neighbors: ['romania', 'serbia', 'croatia', 'austria', 'slovenia', 'slovakia', 'ukraine'],
     intro:
       'Τα ουγγρικά δεν μοιάζουν με τις γλώσσες των γειτόνων τους – συγγενεύουν μακρινά με τα φινλανδικά! Η χώρα έχει πολλές θερμές πηγές και τη μεγάλη λίμνη Μπάλατον.',
     cities: [

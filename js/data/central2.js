@@ -115,7 +115,7 @@ export const CENTRAL2 = {
     language: 'Σλοβακικά',
     currency: 'Ευρώ (€)',
     lonLat: [19.7, 48.7],
-    neighbors: ['czechia', 'poland', 'hungary', 'austria'],
+    neighbors: ['czechia', 'poland', 'hungary', 'austria', 'ukraine'],
     intro: 'Μια ορεινή χώρα στην καρδιά της Ευρώπης, με τα βουνά Τάτρα και χιλιάδες σπηλιές. Ήταν ενωμένη με την Τσεχία ως το 1993.',
     cities: [
       city('bratislava', 'Μπρατισλάβα', 'Η πρωτεύουσα της Σλοβακίας, πάνω στον Δούναβη, πολύ κοντά στα σύνορα με την Αυστρία και την Ουγγαρία.', [
@@ -150,7 +150,7 @@ export const CENTRAL2 = {
     language: 'Πολωνικά',
     currency: 'Ζλότι',
     lonLat: [19.4, 52.1],
-    neighbors: ['germany', 'czechia', 'slovakia'],
+    neighbors: ['germany', 'czechia', 'slovakia', 'lithuania', 'ukraine'],
     intro: 'Μια μεγάλη χώρα με πεδιάδες, δάση και τη Βαλτική Θάλασσα στον βορρά. Στα δάση της ζουν άγριοι βίσονες, τα μεγαλύτερα ζώα της στεριάς της Ευρώπης!',
     cities: [
       city('warsaw', 'Βαρσοβία', 'Η πρωτεύουσα της Πολωνίας, πάνω στον ποταμό Βιστούλα.', [
