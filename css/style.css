@@ -864,6 +864,50 @@ body[data-screen='play'] #touch-layer {
 .info-emoji.pop {
   animation: bounce 0.6s cubic-bezier(0.2, 1.6, 0.4, 1);
 }
+/* Σύντομο κείμενο κάρτας: μεγάλα, ευανάγνωστα γράμματα */
+.card-text {
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 600;
+  margin: 6px 0 0;
+}
+/* «Συνέχεια» με αντίστροφη μέτρηση: γεμίζει σε --read δευτερόλεπτα */
+.btn.countdown {
+  position: relative;
+  overflow: hidden;
+  min-width: 190px;
+}
+.btn.countdown:disabled {
+  opacity: 1;
+  background: #c9bfae;
+  box-shadow: 0 3px 0 #a89c87;
+}
+.countdown-fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(#ff7a24, var(--orange));
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: read-fill var(--read, 3s) linear forwards;
+}
+.btn.countdown.ready .countdown-fill {
+  animation: none;
+  transform: none;
+}
+.countdown-label {
+  position: relative;
+}
+@keyframes read-fill {
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .countdown-fill {
+    animation: none;
+  }
+}
+
 .remember {
   text-align: center;
   font-weight: 800;
