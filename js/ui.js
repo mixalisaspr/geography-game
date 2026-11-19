@@ -35,12 +35,15 @@ export function finalQuiz(city) {
   return CHECKPOINTS.map((cp, n) => {
     if (cp.type === 'item') {
       const it = city.items[cp.i];
-      return { ...it.quiz, checkpoint: n + 1, source: `${it.emoji} ${it.name}: ${it.desc} ${it.fact}` };
+      return { ...it.quiz, checkpoint: n + 1, source: `${it.emoji} ${it.name}: ${it.desc}` };
     }
     const info = city.infos[cp.i];
     return { ...info.quiz, checkpoint: n + 1, source: `📖 ${info.text}` };
   });
 }
+
+/** Δευτερόλεπτα που μένει κλειδωμένο το «Συνέχεια» σε κάθε checkpoint, ώστε να προλάβεις να διαβάσεις. */
+export const READ_SECONDS = 3;
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const esc = (s) =>
@@ -662,29 +665,51 @@ export class UI {
           <div class="item-text">
             <p class="muted">${label} ${isNew ? '· <b class="new">ΝΕΟ!</b>' : ''}</p>
             <h2>Μάζεψες: ${esc(item.name)}</h2>
-            <p>${esc(item.desc)}</p>
+            <p class="card-text">${esc(item.desc)}</p>
           </div>
-        </div>
-        <div class="did-you-know"><b>📖 Ήξερες ότι…</b><p>${esc(item.fact)}</p></div>`;
+        </div>`;
     } else {
       const info = city.infos[cp.i];
       this.sound.checkpoint();
       html = `<div class="info-card">
           <p class="muted">${label} · Πληροφορία</p>
           <div class="info-emoji pop">📖</div>
-          <div class="did-you-know big"><b>Ήξερες ότι…</b><p>${esc(info.text)}</p></div>
+          <div class="did-you-know big"><b>Ήξερες ότι…</b><p class="card-text">${esc(info.text)}</p></div>
         </div>`;
     }
+    let ready = false;
     this.openModal(
-      `${html}${remember}<div class="actions"><button class="btn primary big" data-act="go">Συνέχεια ▶</button></div>`,
+      `${html}${remember}<div class="actions">
+        <button class="btn primary big countdown" data-act="go" disabled style="--read:${READ_SECONDS}s">
+          <span class="countdown-fill"></span><span class="countdown-label">Διάβασε… ${READ_SECONDS}</span>
+        </button>
+      </div>`,
       (ev) => {
-        if (ev.target.closest('[data-act="go"]')) {
+        if (ready && ev.target.closest('[data-act="go"]')) {
           this.sound.click();
           this.closeModal();
           this.game.resume();
         }
       },
     );
+    // Αντίστροφη μέτρηση: το «Συνέχεια» ανοίγει μετά από READ_SECONDS δευτερόλεπτα.
+    const btn = $('[data-act="go"]', this.modalBox);
+    const label2 = $('.countdown-label', btn);
+    let left = READ_SECONDS;
+    const tick = setInterval(() => {
+      if (!btn.isConnected) return clearInterval(tick);
+      left--;
+      if (left > 0) {
+        label2.textContent = `Διάβασε… ${left}`;
+        return;
+      }
+      clearInterval(tick);
+      ready = true;
+      btn.disabled = false;
+      btn.classList.add('ready');
+      label2.textContent = 'Συνέχεια ▶';
+      btn.focus({ preventScroll: true });
+    }, 1000);
   }
 
   /** Mini quiz στον τερματισμό, με ερωτήσεις από όσα είδε ο παίκτης στη διαδρομή. */

@@ -8,7 +8,8 @@ import { generatePickups } from '../js/pickups.js';
 import { buildTrack, trackForCity } from '../js/levels.js';
 import { LevelSim, RIDER_HANDLING, CFG } from '../js/physics.js';
 import { LANDMARKS } from '../js/render.js';
-import { finalQuiz } from '../js/ui.js';
+import { READ_SECONDS, finalQuiz } from '../js/ui.js';
+import { CARDS } from '../js/data/cards.js';
 import {
   RIDER_SCORE,
   addScore,
@@ -74,10 +75,7 @@ test('κάθε πόλη έχει πλήρες περιεχόμενο και έγ
     ids.add(city.id);
     assert.ok(city.name && city.intro, city.id);
     assert.equal(city.items.length, 2, `${city.id}: χρειάζονται 2 αντικείμενα`);
-    for (const it of city.items) {
-      assert.ok(it.emoji && it.name && it.desc, `${city.id}: ελλιπές αντικείμενο`);
-      assert.ok(it.fact && it.fact !== it.desc, `${city.id}: το αντικείμενο «${it.name}» χρειάζεται δική του πληροφορία`);
-    }
+    for (const it of city.items) assert.ok(it.emoji && it.name && it.desc, `${city.id}: ελλιπές αντικείμενο`);
     assert.equal(city.facts, undefined, `${city.id}: οι πληροφορίες ανήκουν στα αντικείμενα`);
     assert.equal(city.infos.length, 2, `${city.id}: χρειάζονται 2 πληροφορίες για τη διαδρομή`);
     const qs = [...city.items.map((i) => i.quiz), ...city.infos.map((i) => i.quiz)];
@@ -139,6 +137,25 @@ test('αν κρατάς συνέχεια γκάζι πέφτεις σε κάθε
     for (let t = 0; t < 120 && sim.state !== 'finished'; t += 1 / 60) sim.update(1 / 60, { gas: true, brake: false });
     assert.ok(sim.crashes >= 2, `${city.id}: μόνο ${sim.crashes} πτώσεις με σκέτο γκάζι`);
   }
+});
+
+test('οι κάρτες των checkpoints είναι σύντομες και γρήγορες στο διάβασμα', () => {
+  const ids = new Set(allCities().map((c) => c.id));
+  for (const id of Object.keys(CARDS)) assert.ok(ids.has(id), `κάρτες για άγνωστη πόλη ${id}`);
+  for (const city of allCities()) {
+    const cards = CARDS[city.id];
+    assert.ok(cards, `${city.id}: λείπουν οι κάρτες`);
+    assert.deepEqual(cards.map((k) => k.kind), ['item', 'info', 'item', 'info'], `${city.id}: σειρά καρτών`);
+    for (const k of cards) {
+      const text = k.desc ?? k.text;
+      assert.ok(text.length <= 90, `${city.id}: πολύ μεγάλο κείμενο (${text.length}): ${text}`);
+      assert.equal(k.fact, undefined, `${city.id}: μία σύντομη πρόταση ανά κάρτα`);
+    }
+  }
+});
+
+test('το «Συνέχεια» στα checkpoints έχει αντίστροφη μέτρηση 3 δευτερολέπτων', () => {
+  assert.equal(READ_SECONDS, 3);
 });
 
 test('το mini quiz έχει μία ερώτηση για κάθε checkpoint, με το κείμενο που είδε ο παίκτης', () => {

@@ -20,14 +20,18 @@ export const BASE = {
 
 export const T = (o) => ({ ...BASE, ...o });
 
-/** Αντικείμενο συλλογής: emoji, όνομα, περιγραφή, «Ήξερες ότι…», ερώτηση + 3 απαντήσεις. */
-export const item = (emoji, name, desc, fact, q, options) => ({ emoji, name, desc, fact, quiz: { q, options } });
+/**
+ * Κάρτα αντικειμένου (checkpoint 🎒): emoji, όνομα, ΜΙΑ σύντομη πρόταση, ερώτηση + 3 απαντήσεις.
+ * Το κείμενο πρέπει να διαβάζεται γρήγορα (≤ 90 χαρακτήρες) και να αφορά τη χώρα
+ * – ή την πόλη, μόνο αν είναι κάτι πολύ γνωστό.
+ */
+export const item = (emoji, name, text, q, options) => ({ kind: 'item', emoji, name, desc: text, quiz: { q, options } });
 
-/** Πληροφορία διαδρομής + ερώτηση για το mini quiz. */
-export const info = (text, q, options) => ({ text, quiz: { q, options } });
+/** Κάρτα πληροφορίας (checkpoint 📖): ένα γνωστό, σύντομο «Ήξερες ότι…» για τη χώρα + ερώτηση. */
+export const info = (text, q, options) => ({ kind: 'info', text, quiz: { q, options } });
 
-/** Πόλη (πίστα). */
-export const city = (id, name, intro, items, infos, theme) => ({ id, name, intro, items, infos, theme: T(theme) });
+/** Πόλη (πίστα). Οι κάρτες της (αντικείμενα + πληροφορίες) βρίσκονται στο js/data/cards*.js. */
+export const city = (id, name, intro, theme) => ({ id, name, intro, theme: T(theme) });
 
 // Έτοιμα «πακέτα» θέματος για να μη γράφουμε τα ίδια χρώματα ξανά και ξανά
 export const THEMES = {
